@@ -1,2 +1,7 @@
 # Hyprland_Diary
-Set of situation I found myself in
+
+As I move to Hyprland from window, I wanted to have diary about some of the problem I encounter. 
+
+Maybe someone will benefit from this, I definitely do. 
+
+I use Caelestia dot for my Hyprland
