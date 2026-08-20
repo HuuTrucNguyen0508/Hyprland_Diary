@@ -2,7 +2,7 @@
 
 The USB dashboard already redraws about once a second. Instead of another watcher service, it just rereads `~/.local/state/caelestia/scheme.json` on each frame. Wallpaper changes and the screen catches up on the next tick.
 
-USB, orientation, and letterbox setup live in [TURZX-SCREEN/Process.md](../../TURZX-SCREEN/Process/Process.md). This note is only colours.
+USB, orientation, and letterbox setup live in [TURZX-SCREEN/Process](../../TURZX-SCREEN/Process/). This note is only colours.
 
 | Piece | Path |
 |--------|------|

@@ -136,7 +136,7 @@ caelestia shell -k; sleep .2; caelestia shell -d
 - Lock is unrelated.
 - Prefer `hyprshutdown --vt 1` / `hl.dsp.exit()` over bare logind `Terminate` on this NVIDIA + SDDM Wayland stack.
 
-See also: [Login screen monitor mismatch](../login-screen-monitor-mismatch/login-screen-monitor-mismatch.md).
+See also: [Login screen monitor mismatch](../login-screen-monitor-mismatch/).
 
 ## Copies in this folder
 

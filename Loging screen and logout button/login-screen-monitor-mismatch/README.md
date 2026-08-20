@@ -2,7 +2,7 @@
 
 After login, Hyprland had DP-3 on the left and HDMI on the right. At the SDDM password screen I had to move *right* to reach the physically *left* monitor. Annoying every single boot.
 
-This is not the Caelestia session drawer issue. That only exists once Hyprland is running. See [logout-button.md](../logout-button/logout-button.md).
+This is not the Caelestia session drawer issue. That only exists once Hyprland is running. See [logout button](../logout-button/).
 
 | Piece | Detail |
 |--------|--------|
@@ -64,7 +64,7 @@ Staged copy and installer on this machine:
 
 Uses sudo. Copies the staged JSON into `/var/lib/sddm/.config/`.
 
-Theme and colour helpers are separate. Wallpaper/palette sync is in [pixie-sddm.md](../../Caelestia_theme_sync/pixie-sddm/pixie-sddm.md).
+Theme and colour helpers are separate. Wallpaper/palette sync is in [pixie-sddm](../../Caelestia_theme_sync/pixie-sddm/).
 
 | Helper | Role |
 |--------|------|

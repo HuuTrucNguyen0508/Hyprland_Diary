@@ -4,7 +4,7 @@ This is the login greeter at `/usr/share/sddm/themes/pixie-caelestia/`. Same wal
 
 Upstream theme: [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm). My greeter is a user-owned fork of that (`pixie` → `pixie-caelestia`) so Caelestia can rewrite wallpaper and colours without fighting package ownership.
 
-It is not the Caelestia session drawer. That one only exists after Hyprland is up. See [logout-button.md](../../Loging%20screen%20and%20logout%20button/logout-button/logout-button.md) for that. Monitor layout for this greeter is in [login-screen-monitor-mismatch.md](../../Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/login-screen-monitor-mismatch.md).
+It is not the Caelestia session drawer. That one only exists after Hyprland is up. See [logout button](../../Loging%20screen%20and%20logout%20button/logout-button/) for that. Monitor layout for this greeter is in [login screen monitor mismatch](../../Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/).
 
 | Piece | Path |
 |--------|------|

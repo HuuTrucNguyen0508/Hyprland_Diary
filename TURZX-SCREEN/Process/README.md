@@ -133,7 +133,7 @@ echo '{"brightness": 40}' > ~/.config/turzx/config.json
 
 Palette sync (reads `~/.local/state/caelestia/scheme.json` each frame) lives with the other theme notes:
 
-[TURZX follows Caelestia](../../Caelestia_theme_sync/turzx/turzx.md)
+[TURZX follows Caelestia](../../Caelestia_theme_sync/turzx/)
 
 ## Copies in this folder
 
