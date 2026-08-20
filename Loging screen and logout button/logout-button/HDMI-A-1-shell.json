@@ -1,0 +1,11 @@
+{
+    "bar": {
+        "persistent": false
+    },
+    "osd": {
+        "enabled": false
+    },
+    "session": {
+        "enabled": false
+    }
+}

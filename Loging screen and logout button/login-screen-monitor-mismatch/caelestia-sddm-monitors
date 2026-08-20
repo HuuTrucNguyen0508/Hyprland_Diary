@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Install kwinoutputconfig for SDDM greeter so DP-3 is left/primary (matches Hyprland).
+set -euo pipefail
+
+SRC="${1:-$HOME/.local/share/caelestia-sddm-kwinoutputconfig.json}"
+DST_DIR="/var/lib/sddm/.config"
+DST="$DST_DIR/kwinoutputconfig.json"
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "Re-running with sudo…"
+  exec sudo "$0" "$@"
+fi
+
+if [[ ! -f "$SRC" ]]; then
+  echo "Missing source config: $SRC" >&2
+  exit 1
+fi
+
+install -d -o sddm -g sddm -m 755 "$DST_DIR"
+install -o sddm -g sddm -m 644 "$SRC" "$DST"
+echo "Installed $DST"
+ls -la "$DST"

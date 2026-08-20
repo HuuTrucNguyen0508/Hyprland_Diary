@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+import subprocess
+import re
+import math
+
+FLAVOUR = "mocha"
+SIZE = "24"
+
+ACCENTS = {
+    "rosewater": "#f5e0dc",
+    "flamingo": "#f2cdcd",
+    "pink": "#f5c2e7",
+    "mauve": "#cba6f7",
+    "red": "#f38ba8",
+    "maroon": "#eba0ac",
+    "peach": "#fab387",
+    "yellow": "#f9e2af",
+    "green": "#a6e3a1",
+    "teal": "#94e2d5",
+    "sky": "#89dceb",
+    "sapphire": "#74c7ec",
+    "blue": "#89b4fa",
+    "lavender": "#b4befe",
+}
+
+def hex_to_rgb(value):
+    value = value.lstrip("#")
+    return tuple(int(value[i:i+2], 16) for i in (0, 2, 4))
+
+output = subprocess.check_output(
+    ["caelestia", "scheme", "get"],
+    text=True
+)
+
+# Caelestia colorizes values with ANSI true-color escape sequences.
+# Extract the primary hex value from the colored output.
+match = re.search(
+    r"primary:\s*(?:\x1b\[[0-9;]*m)?([0-9a-fA-F]{6})",
+    output
+)
+
+if not match:
+    print("Could not find Caelestia primary colour")
+    raise SystemExit(1)
+
+primary = "#" + match.group(1)
+rgb = hex_to_rgb(primary)
+
+closest_name = min(
+    ACCENTS,
+    key=lambda name: math.sqrt(
+        sum(
+            (a - b) ** 2
+            for a, b in zip(
+                rgb,
+                hex_to_rgb(ACCENTS[name])
+            )
+        )
+    )
+)
+
+theme = f"catppuccin-{FLAVOUR}-{closest_name}-cursors"
+
+print(f"Caelestia primary: {primary}")
+print(f"Selected accent:   {closest_name}")
+print(f"Cursor theme:      {theme}")
+
+subprocess.run(
+    ["hyprctl", "setcursor", theme, SIZE],
+    check=False
+)
+
+subprocess.run([
+    "gsettings",
+    "set",
+    "org.gnome.desktop.interface",
+    "cursor-theme",
+    theme
+], check=False)
+
+subprocess.run([
+    "gsettings",
+    "set",
+    "org.gnome.desktop.interface",
+    "cursor-size",
+    SIZE
+], check=False)

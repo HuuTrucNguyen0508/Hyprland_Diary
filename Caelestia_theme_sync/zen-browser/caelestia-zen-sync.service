@@ -1,0 +1,13 @@
+[Unit]
+Description=Sync Caelestia colors to Zen Browser
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/caelestia-zen-sync
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+

@@ -1,0 +1,12 @@
+[Unit]
+Description=Sync Caelestia wallpaper/colours to Pixie SDDM
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/caelestia-sddm-sync --watch
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

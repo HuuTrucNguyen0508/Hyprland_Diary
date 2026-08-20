@@ -1,0 +1,5 @@
+{
+    "wallpaper": {
+        "postHook": "/home/theadenkingof/.local/bin/caelestia-cursor; /home/theadenkingof/.local/bin/caelestia-sddm-sync"
+    }
+}

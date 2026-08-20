@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# One-time (or post pixie-sddm package update) setup for Caelestia→SDDM sync.
+set -euo pipefail
+
+SRC="/usr/share/sddm/themes/pixie"
+DST="/usr/share/sddm/themes/pixie-caelestia"
+DROPIN="/etc/sddm.conf.d/10-wayland-matugen.conf"
+SDDM_CONF="/etc/sddm.conf"
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "Re-running with sudo…"
+  exec sudo "$0" "$@"
+fi
+
+USER_NAME="${SUDO_USER:-${USER}}"
+USER_GROUP="$(id -gn "$USER_NAME")"
+
+if [[ ! -d "$SRC" ]]; then
+  echo "Pixie theme not found at $SRC" >&2
+  exit 1
+fi
+
+rm -rf "$DST"
+cp -a "$SRC" "$DST"
+chown -R "$USER_NAME:$USER_GROUP" "$DST"
+chmod u+w "$DST/theme.conf" "$DST/assets/background.jpg"
+
+# Prefer drop-in (wins over /etc/sddm.conf)
+if [[ -f "$DROPIN" ]]; then
+  if grep -q '^Current=' "$DROPIN"; then
+    sed -i 's/^Current=.*/Current=pixie-caelestia/' "$DROPIN"
+  else
+    printf '\n[Theme]\nCurrent=pixie-caelestia\n' >>"$DROPIN"
+  fi
+fi
+if [[ -f "$SDDM_CONF" ]] && grep -q 'Current=' "$SDDM_CONF"; then
+  sed -i 's/Current=.*/Current=pixie-caelestia/' "$SDDM_CONF"
+fi
+
+echo "Installed $DST (owner $USER_NAME) and set SDDM Current=pixie-caelestia"

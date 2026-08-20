@@ -1,0 +1,164 @@
+{
+    "appearance": {
+        "transparency": {
+            "enabled": false
+        }
+    },
+    "bar": {
+        "activeWindow": {
+            "compact": false,
+            "showOnHover": true
+        },
+        "clock": {
+            "background": true,
+            "showDate": true
+        },
+        "persistent": true,
+        "popouts": {
+            "activeWindow": false
+        },
+        "scrollActions": {
+            "brightness": true
+        },
+        "showOnHover": false,
+        "statusIcons": [
+            {
+                "enabled": true,
+                "id": "network"
+            },
+            {
+                "enabled": true,
+                "id": "bluetooth"
+            },
+            {
+                "enabled": true,
+                "id": "audio"
+            },
+            {
+                "enabled": true,
+                "id": "lockStatus"
+            },
+            {
+                "enabled": false,
+                "id": "microphone"
+            },
+            {
+                "enabled": false,
+                "id": "kbLayout"
+            },
+            {
+                "enabled": false,
+                "id": "battery"
+            }
+        ],
+        "tray": {
+            "background": true,
+            "compact": true,
+            "recolour": false
+        },
+        "workspaces": {
+            "activeIndicator": true,
+            "activeTrail": false,
+            "occupiedBg": false,
+            "perMonitorWorkspaces": true,
+            "shown": 2
+        }
+    },
+    "dashboard": {
+        "performance": {
+            "showBattery": false
+        },
+        "showOnHover": true
+    },
+    "general": {
+        "apps": {
+            "audio": [
+                "easyeffects"
+            ],
+            "explorer": [
+                "dolphin"
+            ],
+            "terminal": [
+                "/usr/bin/ghostty",
+                "--gtk-single-instance=true"
+            ]
+        }
+    },
+    "launcher": {
+        "useFuzzy": {
+            "actions": true,
+            "apps": true,
+            "schemes": true,
+            "variants": true,
+            "wallpapers": true
+        }
+    },
+    "notifs": {
+        "openExpanded": true
+    },
+    "session": {
+        "commands": {
+            "logout": [
+                "sh",
+                "-c",
+                "command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown --vt 1 -t 'Logging out...' || hyprctl dispatch 'hl.dsp.exit()'"
+            ]
+        }
+    },
+    "utilities": {
+        "quickToggles": [
+            {
+                "enabled": true,
+                "id": "wifi"
+            },
+            {
+                "enabled": true,
+                "id": "bluetooth"
+            },
+            {
+                "enabled": true,
+                "id": "mic"
+            },
+            {
+                "enabled": true,
+                "id": "settings"
+            },
+            {
+                "enabled": true,
+                "id": "gameMode"
+            },
+            {
+                "enabled": true,
+                "id": "dnd"
+            },
+            {
+                "enabled": true,
+                "id": "vpn"
+            }
+        ],
+        "toasts": {
+            "nowPlaying": true
+        },
+        "vpn": {
+            "provider": [
+                {
+                    "connectCmd": [
+                        "sh",
+                        "-c",
+                        "pkexec protonvpn connect --country JP"
+                    ],
+                    "disconnectCmd": [
+                        "sh",
+                        "-c",
+                        "pkexec protonvpn disconnect"
+                    ],
+                    "displayName": "Proton VPN (Japan)",
+                    "id": "vpn-msxdp42l-65d0a",
+                    "interface": "protonvpn",
+                    "name": "protonvpn"
+                }
+            ],
+            "selectedProvider": "vpn-msxdp42l-65d0a"
+        }
+    }
+}

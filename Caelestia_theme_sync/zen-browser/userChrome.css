@@ -1,0 +1,14 @@
+@import url("caelestia-colors.css");
+
+/* Zen top/side chrome */
+#navigator-toolbox,
+#nav-bar,
+#urlbar-container,
+#TabsToolbar,
+#PersonalToolbar,
+#PanelUI-menu-button,
+#unified-extensions-button,
+#window-controls {
+background: var(--zen-colors-tertiary) !important;
+}
+
