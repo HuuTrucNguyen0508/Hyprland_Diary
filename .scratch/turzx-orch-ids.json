@@ -1,0 +1,13 @@
+{
+  "run": "run_a5ef767eb275",
+  "t1": "task_55f27d7b03bd",
+  "t2": "task_5499edfe88b6",
+  "t3": "task_745d29f9ffad",
+  "t1_dispatch": "ctx_eeeff59227a4",
+  "t2_dispatch": "ctx_d9a4940a8130",
+  "t1_term": "term_8ccb24c2-d522-42dc-ac26-8e084e95dbb6",
+  "t2_term": "term_968d6baf-1f17-4066-aa1c-82c1a110680d",
+  "t4": "task_ed31921926f0",
+  "t5": "task_8e8f82404162",
+  "gate": "GO"
+}

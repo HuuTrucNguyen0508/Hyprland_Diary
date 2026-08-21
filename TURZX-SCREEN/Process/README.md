@@ -10,78 +10,93 @@ This screen lied to me a lot.
 
 - The USB product table still reports native portrait as 800×1280.
 - On this unit, the library's portrait / landscape names do not match what you see on the glass.
-- Send a 1280×800 image into an 800×1280 buffer (or the reverse) and you get crop, wrap, a vertical seam, duplicated panels. A mess.
-- Stock `turing-smart-screen-python` `DisplayPILImage` rotated the image before USB send (`LANDSCAPE` → 270°, `PORTRAIT` → 180°, and so on). That fought the dashboard's own rotation on this panel.
+- Firmware framebuffer is portrait. Windows and cold-plug leave it expecting an **800×1280** USB stream.
+- Send a raw 1280×800 JPEG while the panel expects 800×1280 and you get a sideways strip plus leftover **TURZX V2** wallpaper on the rest of the glass.
 
 ## Working path
 
 1. Draw the dashboard at 1280×800 (`renderer.py`).
-2. Flip content 180° in `dashboard.py` (`CONTENT_ROTATE = 180`) so text is upright on this mount.
-3. Send a 1280×800 frame with `Orientation.LANDSCAPE`.
-4. Do not zoom or crop (`DEFAULT_ZOOM = 1.0`, `DEFAULT_FIT = 1.0`, crop anchor `center`).
+2. Keep content upright with `CONTENT_ROTATE = 0` in `turzx_screen.py`.
+3. `Orientation.LANDSCAPE` so the library canvas is 1280×800.
+4. Library `DisplayPILImage` rotates **270°** before USB send → panel gets **800×1280**.
+5. Do not zoom or crop (`DEFAULT_ZOOM = 1.0`, `DEFAULT_FIT = 1.0`, crop anchor `center`).
 
 ```bash
 cd ~/Documents/dashboard
 .venv/bin/python dashboard.py
 ```
 
-## Change 1: disable library USB rotation
+## Change 1: keep stock library USB rotation
 
 File: `~/Documents/turing-smart-screen-python/library/lcd/lcd_comm_turing_usb.py`  
 Function: `LcdCommTuringUSB.DisplayPILImage`
 
-Stock code rotated `current_state` depending on orientation, then sent that. On this TURZX that inverted or cropped the picture.
+Stock behaviour (keep it):
 
-Comment out those `transpose(...)` branches and always send the buffer as-is:
+| Orientation | USB transpose | Bytes on the wire |
+|---|---|---|
+| `LANDSCAPE` | `ROTATE_270` | 800×1280 |
+| `REVERSE_LANDSCAPE` | `ROTATE_90` | 800×1280 |
+| `PORTRAIT` | `ROTATE_180` | 800×1280 |
+| `REVERSE_PORTRAIT` | none | 800×1280 |
 
-```python
-base_image = self.current_state
-```
+An earlier experiment disabled those `transpose(...)` branches and sent the 1280×800 canvas as-is. That looked fine until a Windows boot / cable replug left the panel in stock portrait mode again. Then the glass showed a sideways dashboard strip and TURZX V2 on the side.
 
-`SetOrientation()` still picks canvas size (1280×800 vs 800×1280). The dashboard owns flip and scale.
+`SetOrientation()` still picks canvas size. The library owns the portrait USB convert. The dashboard owns content flip (`CONTENT_ROTATE`) and scale.
 
-There is a leftover debug `print("SEND:", ...)` in the same function. Not required for display.
+There is a leftover debug `print("SEND:", ...)`. Useful when checking wire size (`SEND: (800, 1280) ... orientation: LANDSCAPE`).
 
-Stock `main.py` / `8inchTheme2` expect the old rotation. Revert this patch if you run the official theme again.
-
-## Change 2: send landscape 1280×800 from the dashboard
+## Change 2: landscape canvas, no content flip
 
 File: `~/Documents/dashboard/turzx_screen.py`
 
 | Setting | Value | Why |
 |---|---|---|
-| `NATIVE_WIDTH` / `NATIVE_HEIGHT` | 1280 × 800 | Canvas sent to the LCD |
+| `NATIVE_WIDTH` / `NATIVE_HEIGHT` | 1280 × 800 | Canvas before USB rotate |
 | `LCD_ORIENTATION` | `Orientation.LANDSCAPE` | Matches that canvas |
-| `CONTENT_ROTATE` | 180 | Upright on this mount |
+| `CONTENT_ROTATE` | 0 | Upright after library `ROTATE_270` |
 | `DEFAULT_SCALE` | `letterbox` | Keep aspect ratio |
 | `DEFAULT_ZOOM` | 1.0 | Zoom > 1 crops edges |
 | `DEFAULT_FIT` | 1.0 | Fill the 1280×800 canvas |
 | `DEFAULT_CROP_ANCHOR` | `center` | No corner crop |
 
-`LcdCommTuringUSB.__init__` still overwrites width/height from `PRODUCT_ID` (800×1280 for `0x0080`). Orientation `LANDSCAPE` swaps those via `get_width()` / `get_height()`, so the send buffer is 1280×800.
+`LcdCommTuringUSB.__init__` still overwrites width/height from `PRODUCT_ID` (800×1280 for `0x0080`). Orientation `LANDSCAPE` swaps those via `get_width()` / `get_height()`, so the software canvas is 1280×800. USB send is 800×1280 after transpose.
+
+If placement is full-screen but upside down, try `CONTENT_ROTATE = 180` before touching the library rotate again.
 
 ## Change 3: keep the layout wide
 
 Files: `~/Documents/dashboard/renderer.py`, `dashboard.py`
 
-Layout stays 1280×800 (header + 4 metric cards + Network / System / Activity). Do not rebuild a portrait UI for 800×1280. That looked "correctly filled" and was still the wrong orientation.
-
-Do not letterbox a 1280×800 frame into 800×1280 as the main path either. Bars, half-screen content, or stretch distortion.
+Layout stays 1280×800 (header + metric cards + Network / System / Activity). Do not rebuild a portrait UI for 800×1280. The library rotate is what matches the firmware, not a portrait layout.
 
 `--nudge-x/y`, `--fit`, and `--zoom` are still there for fine-tuning. The defaults above are the working set.
+
+## After Windows or a cable unplug
+
+1. Confirm USB: `lsusb -d 1cbe:0080`
+2. Restart the daemon: `systemctl --user restart turzx-dashboard.service`
+3. If you still see TURZX V2 + a sideways strip, the library rotate was disabled or `CONTENT_ROTATE` is wrong. Wire size in the journal should be `(800, 1280)`, not `(1280, 800)`.
+
+Optional hard wipe (stops the service, sends a black 800×1280, then one good frame):
+
+```bash
+systemctl --user stop turzx-dashboard.service
+# then start again once the library path is correct
+systemctl --user start turzx-dashboard.service
+```
 
 ## What failed
 
 | Approach | Result |
 |---|---|
+| Disable library USB rotate, send raw 1280×800 | Works until Windows/cold-plug; then sideways strip + TURZX V2 |
+| `CONTENT_ROTATE = 180` with stock `ROTATE_270` | Full screen but upside down on this mount |
 | `REVERSE_PORTRAIT` + 800×1280 send of a 1280×800 image | Wrap / split / missing cards |
-| Library `PORTRAIT` for "correct red top-left" in diag | Tall buffer → dashboard shown as portrait |
-| `--zoom 1.2` + crop `top-right` after 1280×800 LANDSCAPE | Top and right of the dashboard cut off |
-| Fractional `--offset-y` (e.g. 0.5) | Jumped to a clamp ("dead zone"); tiny positives pinned to the top |
-| `--offset-x` while letterbox filled 800px width | No real horizontal move; edges clipped |
-| Stretch 1280×800 → 800×1280 | Full screen but distorted; still "wide on a tall panel" |
-
-`turzx_diag.py` with `PORTRAIT` often put the red corner at physical top-left. That orientation is still the wrong canvas for a landscape dashboard.
+| Library `PORTRAIT` canvas for the live dashboard | Tall buffer → wrong layout |
+| `--zoom 1.2` + crop `top-right` | Top and right of the dashboard cut off |
+| Fractional `--offset-y` (e.g. 0.5) | Dead zone / jump |
+| Stretch 1280×800 → 800×1280 in the dashboard | Distorted; library rotate is the right convert |
 
 ## Positioning rules if you nudge later
 
@@ -96,9 +111,13 @@ Do not letterbox a 1280×800 frame into 800×1280 as the main path either. Bars,
 | Dashboard | `~/Documents/dashboard/` |
 | Screen defaults | `~/Documents/dashboard/turzx_screen.py` |
 | Layout | `~/Documents/dashboard/renderer.py` |
-| USB library (patched) | `~/Documents/turing-smart-screen-python/library/lcd/lcd_comm_turing_usb.py` |
+| USB library | `~/Documents/turing-smart-screen-python/library/lcd/lcd_comm_turing_usb.py` |
 | Official config (reference) | `~/Documents/turing-smart-screen-python/config.yaml` — `REVISION: TUR_USB`, theme `8inchTheme2` |
 | Boot daemon | `~/.config/systemd/user/turzx-dashboard.service` |
+
+## Related
+
+- [Refresh upgrade spike](../refresh-upgrade-spike/) — full-frame ceiling (~4.7 fps), no true partial USB via the library
 
 ## Boot daemon
 
@@ -114,33 +133,4 @@ loginctl enable-linger "$USER"   # start at boot, before login
 systemctl --user status turzx-dashboard.service
 systemctl --user restart turzx-dashboard.service
 systemctl --user stop turzx-dashboard.service
-journalctl --user -u turzx-dashboard.service -f
 ```
-
-Do not run `python dashboard.py` by hand while the service is active. USB busy.
-
-## Brightness
-
-Lives in `~/.config/turzx/config.json`. Picked up within ~1s, no restart:
-
-```bash
-python ~/Documents/dashboard/turzx-ctl.py brightness 40
-# or
-echo '{"brightness": 40}' > ~/.config/turzx/config.json
-```
-
-## Caelestia colours
-
-Palette sync (reads `~/.local/state/caelestia/scheme.json` each frame) lives with the other theme notes:
-
-[TURZX follows Caelestia](../../Caelestia_theme_sync/turzx/)
-
-## Copies in this folder
-
-| File | Live path |
-|------|-----------|
-| `turzx-dashboard.service` | `~/.config/systemd/user/turzx-dashboard.service` |
-| `turzx_screen.py` | `~/Documents/dashboard/turzx_screen.py` |
-| `lcd_comm_turing_usb.py` | `~/Documents/turing-smart-screen-python/library/lcd/lcd_comm_turing_usb.py` |
-| `config.yaml` | `~/Documents/turing-smart-screen-python/config.yaml` |
-| `turzx-config.json` | `~/.config/turzx/config.json` |

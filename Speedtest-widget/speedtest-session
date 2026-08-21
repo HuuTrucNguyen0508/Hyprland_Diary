@@ -1,0 +1,162 @@
+#!/bin/bash
+# Full download then upload run for the speedtest overlay + TURZX.
+# Writes ~/.local/state/turzx/speedtest.json and prints:
+#   PHASE down|up
+#   <mbps>
+#   DONE | ERROR <msg>
+# After success, state holds for HOLD_SECS then is cleared.
+
+set -uo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/turzx"
+STATE="$STATE_DIR/speedtest.json"
+HOLD_SECS=3
+PHASE_SECS=5
+ENGINE="${NETWORK_SPEEDTEST:-$HOME/.local/bin/network-speedtest}"
+
+down_mbps=0
+up_mbps=0
+engine_pid=""
+fifo=""
+
+mkdir -p "$STATE_DIR"
+
+write_state() {
+  local active="$1"
+  local ph="$2"
+  local until_val="${3:-0}"
+  local err="${4:-}"
+  local tmp
+  tmp=$(mktemp "$STATE_DIR/speedtest.XXXXXX")
+  if [[ $until_val == 0 || $until_val == null ]]; then
+    jq -n \
+      --argjson active "$active" \
+      --arg phase "$ph" \
+      --argjson download_mbps "$down_mbps" \
+      --argjson upload_mbps "$up_mbps" \
+      --arg error "$err" \
+      '{
+        active: $active,
+        phase: $phase,
+        download_mbps: $download_mbps,
+        upload_mbps: $upload_mbps,
+        error: $error,
+        until: null,
+        updated_at: now
+      }' >"$tmp"
+  else
+    jq -n \
+      --argjson active "$active" \
+      --arg phase "$ph" \
+      --argjson download_mbps "$down_mbps" \
+      --argjson upload_mbps "$up_mbps" \
+      --arg error "$err" \
+      --argjson until_val "$until_val" \
+      '{
+        active: $active,
+        phase: $phase,
+        download_mbps: $download_mbps,
+        upload_mbps: $upload_mbps,
+        error: $error,
+        until: $until_val,
+        updated_at: now
+      }' >"$tmp"
+  fi
+  mv -f "$tmp" "$STATE"
+}
+
+clear_state() {
+  rm -f "$STATE"
+}
+
+kill_engine() {
+  if [[ -n ${engine_pid:-} ]] && kill -0 "$engine_pid" 2>/dev/null; then
+    kill "$engine_pid" 2>/dev/null || true
+    wait "$engine_pid" 2>/dev/null || true
+  fi
+  engine_pid=""
+  if [[ -n ${fifo:-} ]]; then
+    rm -f "$fifo"
+    fifo=""
+  fi
+}
+
+on_abort() {
+  kill_engine
+  clear_state
+  exit 0
+}
+
+trap on_abort INT TERM
+
+if [[ ! -x $ENGINE ]]; then
+  echo "ERROR engine missing: $ENGINE" >&2
+  echo "ERROR engine missing"
+  exit 1
+fi
+
+run_phase() {
+  local next="$1"
+  echo "PHASE $next"
+  write_state true "$next" 0 ""
+
+  fifo=$(mktemp -u "$STATE_DIR/speedtest-fifo.XXXXXX")
+  mkfifo "$fifo"
+
+  "$ENGINE" "$next" >"$fifo" &
+  engine_pid=$!
+
+  local line
+  local start=$SECONDS
+
+  # Open fifo for reading without blocking forever if writer dies
+  exec 3<>"$fifo"
+
+  while kill -0 "$engine_pid" 2>/dev/null; do
+    if (( SECONDS - start >= PHASE_SECS )); then
+      kill "$engine_pid" 2>/dev/null || true
+      break
+    fi
+    if read -r -t 1 line <&3; then
+      if [[ $line =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        if [[ $next == down ]]; then
+          down_mbps=$line
+        else
+          up_mbps=$line
+        fi
+        echo "$line"
+        write_state true "$next" 0 ""
+      fi
+    fi
+  done
+
+  # Drain any remaining lines briefly
+  while read -r -t 0.2 line <&3; do
+    if [[ $line =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      if [[ $next == down ]]; then
+        down_mbps=$line
+      else
+        up_mbps=$line
+      fi
+      echo "$line"
+      write_state true "$next" 0 ""
+    fi
+  done
+
+  exec 3<&- 3>&- || true
+  wait "$engine_pid" 2>/dev/null || true
+  engine_pid=""
+  rm -f "$fifo"
+  fifo=""
+}
+
+run_phase down
+run_phase up
+
+until_ts=$(($(date +%s) + HOLD_SECS))
+write_state false "" "$until_ts" ""
+echo "DONE"
+
+sleep "$HOLD_SECS"
+clear_state
+exit 0

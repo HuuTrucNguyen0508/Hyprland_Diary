@@ -11,6 +11,8 @@ Each note folder also holds copies of the config / scripts that entry talks abou
 ## Entries
 
 - [TURZX smart screen](./TURZX-SCREEN/Process/)
+- [TURZX refresh upgrade spike](./TURZX-SCREEN/refresh-upgrade-spike/)
+- [TURZX host-engine refresh](./TURZX-SCREEN/host-engine-refresh/)
 - [Login screen monitor mismatch](./Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/)
 - [Logout button](./Loging%20screen%20and%20logout%20button/logout-button/)
 - [Orca theme + Caelestia](./Orca-ide-theme-error/)
@@ -18,3 +20,4 @@ Each note folder also holds copies of the config / scripts that entry talks abou
 - [Pixie SDDM follows Caelestia](./Caelestia_theme_sync/pixie-sddm/)
 - [Zen Browser follows Caelestia](./Caelestia_theme_sync/zen-browser/)
 - [TURZX follows Caelestia](./Caelestia_theme_sync/turzx/)
+- [Speedtest widget (TURZX only)](./Speedtest-widget/)

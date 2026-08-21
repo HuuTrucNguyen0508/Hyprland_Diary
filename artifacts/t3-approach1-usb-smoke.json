@@ -1,0 +1,127 @@
+{
+  "content_rotate": 0,
+  "orientation": "LANDSCAPE",
+  "idle_interval": 1.0,
+  "busy_interval": 0.25,
+  "phases": {
+    "upright": {
+      "sent": true,
+      "usb_s": 0.317,
+      "content_rotate": 0,
+      "orientation": "LANDSCAPE"
+    },
+    "idle_dirty_skip": {
+      "sends": 1,
+      "skips": 2,
+      "intervals": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ok": true
+    },
+    "busy_scheme": {
+      "sends": 1,
+      "skips": 4,
+      "intervals": [
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "identity": "('dynamic/default/dark', '0385c0e3a9c1')",
+      "ok": true
+    },
+    "busy_speedtest": {
+      "sends": 4,
+      "skips": 0,
+      "intervals": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "ok": true
+    }
+  },
+  "pass": true,
+  "events": [
+    {
+      "phase": "upright",
+      "action": "send",
+      "usb_s": 0.317
+    },
+    {
+      "phase": "idle",
+      "action": "send",
+      "interval": 1.0,
+      "usb_s": 0.323
+    },
+    {
+      "phase": "idle",
+      "action": "skip",
+      "interval": 1.0
+    },
+    {
+      "phase": "idle",
+      "action": "skip",
+      "interval": 1.0
+    },
+    {
+      "phase": "busy_scheme",
+      "action": "send",
+      "interval": 0.25,
+      "usb_s": 0.314,
+      "identity": "('dynamic/default/dark', '0385c0e3a9c1')"
+    },
+    {
+      "phase": "busy_scheme",
+      "action": "skip",
+      "interval": 0.25
+    },
+    {
+      "phase": "busy_scheme",
+      "action": "skip",
+      "interval": 0.25
+    },
+    {
+      "phase": "busy_scheme",
+      "action": "skip",
+      "interval": 0.25
+    },
+    {
+      "phase": "busy_scheme",
+      "action": "skip",
+      "interval": 0.25
+    },
+    {
+      "phase": "busy_speedtest",
+      "action": "send",
+      "interval": 0.25,
+      "usb_s": 0.223,
+      "visible": true
+    },
+    {
+      "phase": "busy_speedtest",
+      "action": "send",
+      "interval": 0.25,
+      "usb_s": 0.222,
+      "visible": true
+    },
+    {
+      "phase": "busy_speedtest",
+      "action": "send",
+      "interval": 0.25,
+      "usb_s": 0.222,
+      "visible": true
+    },
+    {
+      "phase": "busy_speedtest",
+      "action": "send",
+      "interval": 0.25,
+      "usb_s": 0.222,
+      "visible": true
+    }
+  ]
+}

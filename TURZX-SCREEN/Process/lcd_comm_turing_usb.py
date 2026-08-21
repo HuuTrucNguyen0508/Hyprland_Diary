@@ -989,15 +989,17 @@ class LcdCommTuringUSB(LcdComm):
         # Paste new image over existing screen state
         self.current_state.paste(image, (x, y))
 
-        # Rotate image before sending to screen: all images sent to the screen are in portrait mode
-        #if self.orientation == Orientation.LANDSCAPE:
-         #   base_image = self.current_state.transpose(Image.Transpose.ROTATE_270)
-        #elif self.orientation == Orientation.REVERSE_LANDSCAPE:
-        #    base_image = self.current_state.transpose(Image.Transpose.ROTATE_90)
-        #elif self.orientation == Orientation.PORTRAIT:
-        #    base_image = self.current_state.transpose(Image.Transpose.ROTATE_180)
-        #else:  # Orientation.REVERSE_PORTRAIT is initial screen orientation
-        base_image = self.current_state
+        # Rotate before USB send: firmware framebuffer is always portrait (800x1280 on
+        # this 8"). Windows / cold-plug leave the panel expecting that stream. Sending
+        # raw 1280x800 LANDSCAPE leaves a sideways strip + leftover TURZX V2 wallpaper.
+        if self.orientation == Orientation.LANDSCAPE:
+            base_image = self.current_state.transpose(Image.Transpose.ROTATE_270)
+        elif self.orientation == Orientation.REVERSE_LANDSCAPE:
+            base_image = self.current_state.transpose(Image.Transpose.ROTATE_90)
+        elif self.orientation == Orientation.PORTRAIT:
+            base_image = self.current_state.transpose(Image.Transpose.ROTATE_180)
+        else:  # Orientation.REVERSE_PORTRAIT is initial screen orientation
+            base_image = self.current_state
 
         print(
     		"SEND:",

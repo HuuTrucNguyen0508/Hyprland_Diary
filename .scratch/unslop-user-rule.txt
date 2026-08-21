@@ -1,0 +1,2 @@
+Always apply unslop before any user-facing text. Do not wait for /unslop or an @-mention.
+Follow ~/.agents/skills/unslop/SKILL.md and ~/.cursor/rules/unslop.mdc every turn: cut AI tells, add human voice, no em dashes, no chatbot filler, plain speech, self-audit before send.

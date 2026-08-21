@@ -1,0 +1,20 @@
+[Unit]
+Description=TURZX 8" landscape system dashboard
+Documentation=file:///home/theadenkingof/Documents/Code/Hyprland%20Diary/TURZX-SCREEN/Process.md
+After=graphical-session.target network-online.target
+Wants=network-online.target
+# USB exclusive — do not run the official turing-smart-screen driver at the same time
+Conflicts=turing-smart-screen.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/theadenkingof/Documents/dashboard
+Environment=PATH=/usr/bin:/usr/local/bin
+ExecStart=/home/theadenkingof/Documents/dashboard/.venv/bin/python /home/theadenkingof/Documents/dashboard/dashboard.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=8
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=default.target
