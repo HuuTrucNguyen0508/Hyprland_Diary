@@ -1,16 +1,27 @@
 # TURZX refresh upgrade spike
 
-Can this TURZX (TUR_USB `1cbe:0080`) get a snappier refresh, or are we stuck uploading full compressed frames?
+Aug 2026. Can this TURZX (`1cbe:0080`) get a snappier refresh, or are we stuck uploading full compressed frames?
 
-First ceiling probe: 2026-08-21. Follow-ups (dual-rate host engine + H.264 USB): 2026-08-22.
+**Short answer:** ~5 fps full-frame JPEG ceiling on USB. Dirty-rect on the public library path is a no-go. H.264 on stock firmware works and became the opt-in live encoder. Shipped dual-rate + dirty skip: [host-engine-refresh](../host-engine-refresh/).
 
-Stop `turzx-dashboard.service` before any USB probe. The port is exclusive.
+## Catch up in 60 seconds
+
+Stop the dashboard before any USB probe. Port is exclusive.
 
 ```bash
 systemctl --user stop turzx-dashboard.service
 cd ~/Documents/dashboard && .venv/bin/python turzx_refresh_probe.py --frames 15
 systemctl --user start turzx-dashboard.service
 ```
+
+| Question | Answer |
+|----------|--------|
+| Faster always-on JPEG? | Dual-rate + dirty skip (~1 Hz idle, burst 0.25 s) |
+| Partial USB updates? | No on public `DisplayPILImage` path |
+| Smooth high refresh? | H.264 cmds 17/121/122/123; opt-in `turzx_h264_live.py` |
+| Custom panel firmware? | See [custom-firmware-explore](../custom-firmware-explore/) — not worth it on the live unit |
+
+First ceiling probe: 2026-08-21. Dual-rate + H.264 USB: 2026-08-22.
 
 ## Verdict
 

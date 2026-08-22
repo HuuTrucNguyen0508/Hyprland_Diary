@@ -1,0 +1,24 @@
+{
+  "ts": "2026-08-21T23:51:40.127460+00:00",
+  "vid": "1cbe",
+  "target_pid": "0080",
+  "cmd": 100,
+  "restart_used": false,
+  "dev_pid": "0080",
+  "product_wh": [
+    800,
+    1280
+  ],
+  "usb_ms": 101.33,
+  "storage": {
+    "ok": true,
+    "total_raw": 0,
+    "used_raw": 0,
+    "valid_raw": 0,
+    "total": "0.00 MB",
+    "used": "0.00 MB",
+    "valid": "0.00 MB",
+    "response_len": 512
+  },
+  "ok": true
+}

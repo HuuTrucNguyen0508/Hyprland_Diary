@@ -1,10 +1,23 @@
 # Cursor follows Caelestia
 
-Caelestia has a live dynamic scheme. Catppuccin cursors do not. This script bridges that gap in the dumbest way that works: grab the primary colour, pick the nearest Catppuccin Mocha accent, shove it into Hyprland and GTK.
+Caelestia has a live dynamic scheme. Catppuccin cursors do not. `caelestia-cursor` grabs the primary colour, picks the nearest Catppuccin Mocha accent, and applies it to Hyprland + GTK.
 
-Script: `~/.local/bin/caelestia-cursor`  
-Package: `catppuccin-cursors-mocha`  
-Size: 24
+## Catch up in 60 seconds
+
+Wallpaper change → `postHook` runs the script → pointer theme updates (not always instant). Session start: delayed run in `execs.lua` after Caelestia writes `scheme.json`.
+
+```bash
+~/.local/bin/caelestia-cursor
+# expect: Caelestia primary, Selected accent, Cursor theme lines
+```
+
+Package: `catppuccin-cursors-mocha`. Size: 24.
+
+| Piece | Path |
+|-------|------|
+| Script | `~/.local/bin/caelestia-cursor` |
+| Wallpaper hook | `~/.config/caelestia/cli.json` → `wallpaper.postHook` |
+| Session start | `~/.config/hypr/hyprland/execs.lua` |
 
 ## What it does
 
@@ -41,9 +54,9 @@ hl.exec_cmd("sleep 2 && ~/.local/bin/caelestia-cursor")
 
 The sleep is there because Caelestia needs a moment to write `scheme.json`. Without it you sometimes get the previous accent for a few seconds.
 
-## Caveats right now
+## Caveats
 
-After a wallpaper change the script usually runs from the `postHook`, but the pointer can still take a bit to catch up. Not instant. Same slow apply feeling as Zen after a restart.
+After a wallpaper change the script usually runs from the `postHook`, but the pointer can still take a bit to catch up. Same slow apply feeling as Zen after a restart.
 
 ## Check
 
@@ -51,15 +64,7 @@ After a wallpaper change the script usually runs from the `postHook`, but the po
 ~/.local/bin/caelestia-cursor
 ```
 
-You should see something like:
-
-```text
-Caelestia primary: #ecbe8a
-Selected accent:   peach
-Cursor theme:      catppuccin-mocha-peach-cursors
-```
-
-Change wallpaper, wait a moment, then check the pointer.
+Change wallpaper, wait a moment, then look at the pointer.
 
 ## Copies in this folder
 

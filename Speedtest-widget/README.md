@@ -1,6 +1,15 @@
 # Speedtest widget (TURZX only)
 
-Super+Shift+F runs a Fast.com speedtest on the TURZX panel only. No desktop overlay.
+Aug 2026. `Super+Shift+F` runs Fast.com on the TURZX panel only. No desktop overlay.
+
+## Catch up in 60 seconds
+
+Press `Super+Shift+F` to start; press again to abort. While active, the dashboard drops dirty skip and pushes gauge frames as fast as USB allows (~5 fps). When the run finishes, finals hold ~3 s, then normal cards return.
+
+```bash
+cat ~/.local/state/turzx/speedtest.json   # active / phase / Mbps / until
+systemctl --user restart turzx-dashboard.service   # after dashboard code changes
+```
 
 ## How it works
 

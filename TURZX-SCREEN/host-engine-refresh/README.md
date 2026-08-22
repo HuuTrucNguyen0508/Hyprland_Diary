@@ -1,47 +1,82 @@
 # TURZX host-engine refresh
 
-Dual-rate JPEG/PNG host loop, shared top-plate UI, ASAP speedtest gauges, and an opt-in H.264 live experiment. Built on top of the [refresh upgrade spike](../refresh-upgrade-spike/) (full-frame USB ceiling ~5 fps; dirty-rect USB is a no-go on the public library path).
+Aug 2026. The always-on dashboard loop: dual-rate JPEG to USB, logical dirty skip, shared top metrics plate, speedtest gauges at full USB speed. H.264 live encoding exists but stays opt-in.
 
-Live code lives under `~/Documents/dashboard`. Prefer those paths if this folder drifts.
+Built on [refresh upgrade spike](../refresh-upgrade-spike/) measurements (~5 fps full-frame ceiling on JPEG; dirty-rect USB does not help on the public library path).
+
+Live code: `~/Documents/dashboard`. Copies here drift; trust live paths.
 
 ![Shared top-plate preview](preview-shared-plate.png)
 
-## What shipped (always-on)
+## Catch up in 60 seconds
 
-### Dual-rate + logical dirty skip
+**Boot default:** `turzx-dashboard.service` pushes JPEG frames over USB at ~1 Hz when idle. Caelestia scheme changes burst to 0.25 s for 8 s. Speedtest and ambient modes ignore dirty skip and repaint every frame they need.
 
-`dashboard.py` + `frame_dirty.py`:
+**What you see** depends on view priority (speedtest → peek → game mode → ambient). Ambient details: [ambient-screens](../ambient-screens/).
 
-| Mode | Interval | Dirty skip |
-|------|----------|------------|
-| Idle | 1.0 s (`--idle-interval` / `--interval`) | Yes |
-| Scheme/palette burst (8 s) | 0.25 s (`--busy-interval`) | Yes |
-| Speedtest gauges visible | **0** (`--speedtest-interval`, ASAP) | **No** |
-
-Busy burst triggers when the Caelestia scheme identity changes. Speedtest uses flat-out full frames so the needles move as fast as USB allows (~4.7–5 fps measured earlier). Idle stays low-CPU.
-
-Dirty fingerprint: scheme name/hash, speedtest fields, clock `%H:%M`, rounded stats (percents nearest 1, net nearest 0.1, temps nearest 1). Unchanged → skip `render` + `DisplayPILImage`, still sleep.
-
-Orientation unchanged: `CONTENT_ROTATE = 0`, `Orientation.LANDSCAPE`, stock library USB `ROTATE_270` → wire **800×1280**. Do not skip library rotate.
-
-### Shared metrics plate (mid-bar fix)
-
-`renderer.py` draws CPU / GPU / RAM / picture as **one** rounded plate with vertical dividers. Four separate cards used to share a bottom edge; H.264 turned that into a full-width rule through the sparklines and logo. Normal gutter between the top plate and Storage/Bonsai/Weather stays.
-
-### Service
+**Restart:**
 
 ```bash
 systemctl --user restart turzx-dashboard.service
 ```
 
-Unit copy: [`turzx-dashboard.service`](turzx-dashboard.service). Live unit: `~/.config/systemd/user/turzx-dashboard.service` (plus `PYTHONUNBUFFERED=1` drop-in).
+**Sanity:**
 
-## H.264 (opt-in experiment only)
+```bash
+systemctl --user is-active turzx-dashboard.service
+journalctl --user -u turzx-dashboard.service -n 5 --no-pager | rg 'SEND|palette'
+# expect: SEND: (800, 1280) … orientation: LANDSCAPE
+```
 
-Not wired into the user service. Clip path and live encoder are documented in [refresh-upgrade-spike](../refresh-upgrade-spike/). Copies here for convenience:
+**Do not** run H.264 and the service on USB at the same time. Toggle: `~/.config/hypr/scripts/toggle_h264_live.sh`.
 
-- [`turzx_h264_live.py`](turzx_h264_live.py) — live dashboard → ffmpeg (default libx264) → Annex-B chunks
-- [`h264_usb.py`](h264_usb.py) — preamble / negotiate / PLAY / STOP helpers
+## Dual-rate + dirty skip
+
+`dashboard.py` + `frame_dirty.py`:
+
+| Mode | Sleep | Dirty skip |
+|------|-------|------------|
+| Idle | 1.0 s (`--idle-interval`) | Yes |
+| Scheme burst (8 s after palette change) | 0.25 s (`--busy-interval`) | Yes |
+| Speedtest gauges | 0 (`--speedtest-interval`) | No |
+| Ambient terminal | 0 extra (`--ambient-interval`; capture waits in `poll()`) | No |
+
+Busy burst fires when Caelestia scheme name/hash changes. Speedtest runs flat out (~4.7–5 fps measured). Idle stays cheap on CPU.
+
+Fingerprint skips USB when unchanged: scheme identity, speedtest fields, clock minute, rounded stats. View name is in the fingerprint so ambient ↔ stats always repaints.
+
+Wire size stays **800×1280**: `CONTENT_ROTATE = 0`, `Orientation.LANDSCAPE`, stock library `ROTATE_270`. Do not skip library rotate. [Process](../Process/) explains why.
+
+## Shared top plate
+
+CPU, GPU, RAM, and the picture card share one rounded plate with vertical dividers. Four separate cards used to share a bottom edge; H.264 turned that into a full-width line through the sparklines.
+
+## Ambient + stats views
+
+Same service, different render path. Stats use `renderer.render()`. Ambient uses `render_terminal()` on an 80×24 ANSI grid. See [ambient-screens](../ambient-screens/).
+
+## Service
+
+```bash
+systemctl --user restart turzx-dashboard.service
+```
+
+Unit snapshot: [`turzx-dashboard.service`](turzx-dashboard.service). Live: `~/.config/systemd/user/turzx-dashboard.service` (+ `PYTHONUNBUFFERED=1` drop-in).
+
+## H.264 (opt-in; JPEG stays boot default)
+
+Not in `turzx-dashboard.service`. Encoder exits clean (cmd 123 + still restore). Refuses to start if the JPEG service still holds USB.
+
+Toggle script: [`toggle_h264_live.sh`](toggle_h264_live.sh) → live `~/.config/hypr/scripts/toggle_h264_live.sh`
+
+```bash
+~/.config/hypr/scripts/toggle_h264_live.sh   # stop JPEG service → start H.264
+~/.config/hypr/scripts/toggle_h264_live.sh   # stop H.264 → restart JPEG service
+```
+
+Pidfile: `~/.local/state/turzx/h264_live.pid`. Log: `$XDG_RUNTIME_DIR/turzx-h264-live.log`. `TURZX_H264_FPS` default 15.
+
+Manual sandwich:
 
 ```bash
 systemctl --user stop turzx-dashboard.service
@@ -49,34 +84,44 @@ cd ~/Documents/dashboard && .venv/bin/python turzx_h264_live.py --seconds 12 --f
 systemctl --user start turzx-dashboard.service
 ```
 
-USB is exclusive. Encode at wire **800×1280** (ROTATE_270 of the 1280×800 layout). Live path still has ~0.5 s first-paint latency and burns an encoder; keep JPEG dual-rate for boot/always-on unless you promote this later.
+After aborting H.264, confirm service is `active`, journal shows `SEND: (800, 1280)`, glass upright (no sideways strip + TURZX V2 leftover).
+
+Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 
 ## Live paths
 
 | Piece | Path |
 |-------|------|
 | Loop | `~/Documents/dashboard/dashboard.py` |
-| Dirty / busy helpers | `~/Documents/dashboard/frame_dirty.py` |
-| Layout / shared plate | `~/Documents/dashboard/renderer.py` |
-| Orientation constants | `~/Documents/dashboard/turzx_screen.py` |
+| Dirty / busy | `~/Documents/dashboard/frame_dirty.py` |
+| Layout | `~/Documents/dashboard/renderer.py` |
+| Orientation | `~/Documents/dashboard/turzx_screen.py` |
 | Speedtest state | `~/Documents/dashboard/speedtest_state.py` |
-| User service | `~/.config/systemd/user/turzx-dashboard.service` |
-| Spike / H.264 inventory | [`../refresh-upgrade-spike/`](../refresh-upgrade-spike/) |
-| Speedtest bind + engine | [`../../Speedtest-widget/`](../../Speedtest-widget/) |
+| Ambient / capture / game mode | [ambient-screens](../ambient-screens/) |
+| Service | `~/.config/systemd/user/turzx-dashboard.service` |
+| H.264 toggle | `~/.config/hypr/scripts/toggle_h264_live.sh` |
+| Speedtest bind | [Speedtest widget](../../Speedtest-widget/) |
+| Firmware explore | [custom-firmware-explore](../custom-firmware-explore/) |
 
 ## Copies in this folder
 
 | File | Role |
 |------|------|
-| `dashboard.py` | Dual-rate loop, ASAP speedtest |
+| `dashboard.py` | Loop + view priority |
 | `frame_dirty.py` | Fingerprint + scheme burst |
-| `renderer.py` | Shared top plate + gauges |
+| `renderer.py` | Stats layout + `render_terminal` |
+| `ambient_cycle.py` | Ambient rotation |
+| `term_capture.py` | `script` capture |
+| `game_mode.py` | Game detection |
+| `dashboard_peek.py` | Peek state |
 | `turzx-dashboard.service` | Unit snapshot |
-| `turzx_h264_live.py` / `h264_usb.py` | Opt-in H.264 experiment |
-| `preview-shared-plate.png` | Layout preview after plate redesign |
+| `turzx_h264_live.py`, `h264_usb.py` | H.264 experiment |
+| `toggle_h264_live.sh` | JPEG ↔ H.264 |
+| `preview-shared-plate.png` | Layout screenshot |
 
 ## Related
 
-- [What made TURZX work](../Process/) — orientation / stock rotate
-- [Refresh upgrade spike](../refresh-upgrade-spike/) — fps ceiling, H.264 go bar, probe scripts
-- [Speedtest widget](../../Speedtest-widget/) — Super+Shift+F engine and state JSON
+- [Process](../Process/) — orientation / stock rotate
+- [Refresh upgrade spike](../refresh-upgrade-spike/) — fps ceiling, probes
+- [Ambient screens](../ambient-screens/) — terminal apps, binds, black-screen traps
+- [Speedtest widget](../../Speedtest-widget/) — `Super+Shift+F`

@@ -1,0 +1,15 @@
+hide_hud = true
+silent = true
+
+[location]
+latitude = 49.017
+longitude = 2.100
+auto = false
+hide = true
+display = "city"
+city = "Éragny"
+
+[units]
+temperature = "celsius"
+wind_speed = "kmh"
+precipitation = "mm"

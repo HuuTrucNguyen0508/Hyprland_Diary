@@ -4,6 +4,17 @@ USB `1cbe:0080` TURZX1.0, 8" panel, mounted landscape-wide. Custom dashboard at 
 
 This screen lied to me a lot.
 
+## Catch up in 60 seconds
+
+Draw at **1280×800**, library sends **800×1280** on USB (`ROTATE_270`, do not disable). Wrong size → sideways strip + TURZX V2 wallpaper ghost.
+
+```bash
+systemctl --user restart turzx-dashboard.service
+journalctl --user -u turzx-dashboard.service -n 3 --no-pager   # expect SEND: (800, 1280)
+```
+
+Live code: `~/Documents/dashboard/`. Ambient / game mode / speedtest: [ambient-screens](../ambient-screens/).
+
 ![Working TURZX dashboard preview](../Photo/preview.png)
 
 ## Hardware facts that are easy to get wrong

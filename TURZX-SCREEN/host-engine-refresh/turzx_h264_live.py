@@ -5,10 +5,10 @@ Renders the normal 1280x800 dashboard, rotates to wire 800x1280, encodes with
 ffmpeg (prefer h264_nvenc, else libx264 ultrafast/zerolatency), and pushes
 Annex-B chunks over the proven TUR_USB path.
 
-Stop turzx-dashboard.service first (USB exclusive).
+Stop turzx-dashboard.service first (USB exclusive), or use toggle_h264_live.sh.
 
   systemctl --user stop turzx-dashboard.service
-  cd ~/Documents/dashboard && .venv/bin/python turzx_h264_live.py --seconds 15 --fps 15
+  cd ~/Documents/dashboard && .venv/bin/python turzx_h264_live.py --seconds 0 --fps 15
   systemctl --user start turzx-dashboard.service
 """
 
@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from library.lcd.lcd_comm import Orientation  # noqa: E402
 from library.lcd.lcd_comm_turing_usb import LcdCommTuringUSB  # noqa: E402
+import usb.core  # noqa: E402
 
 from dashboard import prepare_frame  # noqa: E402
 from h264_usb import (  # noqa: E402
@@ -74,6 +75,28 @@ from turzx_screen import (  # noqa: E402
 
 FONT_DIR = TURING_ROOT / "res" / "fonts"
 OUT_DIR = Path(__file__).resolve().parent / "diag"
+SERVICE = "turzx-dashboard.service"
+
+
+def dashboard_service_active() -> bool:
+    try:
+        r = subprocess.run(
+            ["systemctl", "--user", "is-active", "--quiet", SERVICE],
+            check=False,
+        )
+        return r.returncode == 0
+    except OSError:
+        return False
+
+
+def require_usb_free(*, allow_busy: bool = False) -> None:
+    """Fail fast when the JPEG dashboard still owns the exclusive USB port."""
+    if dashboard_service_active() and not allow_busy:
+        raise RuntimeError(
+            f"{SERVICE} is active and holds USB. "
+            f"Stop it first (or use ~/.config/hypr/scripts/toggle_h264_live.sh): "
+            f"systemctl --user stop {SERVICE}"
+        )
 
 
 def require_ffmpeg() -> str:
@@ -285,7 +308,18 @@ def main() -> int:
         help="Results JSON",
     )
     parser.add_argument("--rotate", type=int, default=CONTENT_ROTATE, choices=(0, 90, 180, 270))
+    parser.add_argument(
+        "--allow-busy",
+        action="store_true",
+        help="Skip the turzx-dashboard.service active check (usually fails on USB)",
+    )
     args = parser.parse_args()
+
+    try:
+        require_usb_free(allow_busy=args.allow_busy)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
     ffmpeg = require_ffmpeg()
     encoder = pick_encoder(ffmpeg, args.encoder)
@@ -313,38 +347,6 @@ def main() -> int:
         print(f"warming bonsai up to {args.bonsai_warmup:.0f}s…")
         warm_bonsai(collector, settings_watch, timeout_s=args.bonsai_warmup)
 
-    lcd = LcdCommTuringUSB(
-        com_port="AUTO",
-        display_width=NATIVE_WIDTH,
-        display_height=NATIVE_HEIGHT,
-    )
-    lcd.InitializeComm()
-    lcd.SetOrientation(LCD_ORIENTATION)
-    assert lcd.orientation == Orientation.LANDSCAPE
-
-    ff_cmd = [
-        ffmpeg,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "rgb24",
-        "-s",
-        f"{WIRE_W}x{WIRE_H}",
-        "-r",
-        str(args.fps),
-        "-i",
-        "pipe:0",
-        *ffmpeg_encoder_args(encoder, args.fps),
-        "-an",
-        "-f",
-        "h264",
-        "pipe:1",
-    ]
-    print("ffmpeg:", " ".join(ff_cmd))
-
     results: dict = {
         "encoder": encoder,
         "fps": args.fps,
@@ -359,9 +361,50 @@ def main() -> int:
     layout_refreshes = 0
     pusher: AnnexBPusher | None = None
     proc: subprocess.Popen | None = None
+    lcd: LcdCommTuringUSB | None = None
+    stream_started = False
 
     try:
+        try:
+            lcd = LcdCommTuringUSB(
+                com_port="AUTO",
+                display_width=NATIVE_WIDTH,
+                display_height=NATIVE_HEIGHT,
+            )
+        except (usb.core.USBError, ValueError, RuntimeError) as exc:
+            raise RuntimeError(
+                f"USB open failed ({exc!r}). Is {SERVICE} still holding the device?"
+            ) from exc
+
+        lcd.InitializeComm()
+        lcd.SetOrientation(LCD_ORIENTATION)
+        assert lcd.orientation == Orientation.LANDSCAPE
+
+        ff_cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{WIRE_W}x{WIRE_H}",
+            "-r",
+            str(args.fps),
+            "-i",
+            "pipe:0",
+            *ffmpeg_encoder_args(encoder, args.fps),
+            "-an",
+            "-f",
+            "h264",
+            "pipe:1",
+        ]
+        print("ffmpeg:", " ".join(ff_cmd))
+
         video_preamble(lcd.dev, frame_rate=args.fps)
+        stream_started = True
         chunk_size = negotiate_chunk_size(lcd.dev)
         print(f"chunk_size={chunk_size}")
         results["chunk_size"] = chunk_size
@@ -469,30 +512,36 @@ def main() -> int:
         results["ok"] = False
         results["error"] = repr(exc)
         print(f"ERROR: {exc}", file=sys.stderr)
-        try:
-            stop_stream(lcd.dev)
-        except Exception:
-            pass
         if proc is not None:
             try:
                 if proc.stdin:
                     proc.stdin.close()
             except Exception:
                 pass
-            proc.kill()
+            try:
+                proc.kill()
+            except Exception:
+                pass
         if pusher is not None:
             pusher.stop()
     finally:
         collector.close()
-        try:
-            restore_still(lcd, last_frame)
-            results["restored_still"] = True
-        except Exception as exc:
-            results["restore_error"] = repr(exc)
-        try:
-            lcd.closeSerial()
-        except Exception:
-            pass
+        if lcd is not None and stream_started:
+            try:
+                stop_stream(lcd.dev)
+                results["stopped_stream"] = True
+            except Exception as exc:
+                results["stop_error"] = repr(exc)
+        if lcd is not None:
+            try:
+                restore_still(lcd, last_frame)
+                results["restored_still"] = True
+            except Exception as exc:
+                results["restore_error"] = repr(exc)
+            try:
+                lcd.closeSerial()
+            except Exception:
+                pass
 
     args.json_out.parent.mkdir(parents=True, exist_ok=True)
     args.json_out.write_text(json.dumps(results, indent=2) + "\n")

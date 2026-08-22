@@ -1,18 +1,26 @@
 # TURZX follows Caelestia
 
-The USB dashboard already redraws about once a second. Instead of another watcher service, it just rereads `~/.local/state/caelestia/scheme.json` on each frame. Wallpaper changes and the screen catches up on the next tick.
+No separate sync service. The dashboard reads `~/.local/state/caelestia/scheme.json` every frame (~1 Hz idle). Wallpaper change → next tick picks up new colours.
 
-USB, orientation, and letterbox setup live in [TURZX-SCREEN/Process](../../TURZX-SCREEN/Process/). This note is only colours.
+USB orientation and letterbox: [TURZX Process](../../TURZX-SCREEN/Process/). Ambient / game mode / speedtest views: [host-engine-refresh](../../TURZX-SCREEN/host-engine-refresh/).
+
+## Catch up in 60 seconds
+
+```bash
+systemctl --user is-active turzx-dashboard.service
+jq '.name, .colours.primary' ~/.local/state/caelestia/scheme.json
+```
+
+Change wallpaper. Within about a second the TURZX cards and bars should shift. No restart.
+
+Broken or missing `scheme.json` → hardcoded Everforest fallback (`name=everforest-fallback`).
 
 | Piece | Path |
-|--------|------|
+|-------|------|
 | Dashboard | `~/Documents/dashboard/` |
 | Palette code | `~/Documents/dashboard/theme.py` |
 | Scheme | `~/.local/state/caelestia/scheme.json` |
-| Fallback | Everforest Dark Medium, hardcoded |
 | Service | `turzx-dashboard.service` |
-
-No `caelestia-turzx-sync`. The process itself is the sync.
 
 ## Mapping
 
@@ -35,8 +43,6 @@ No `caelestia-turzx-sync`. The process itself is the sync.
 | `net_down` | `teal`, `sky`, `sapphire` |
 | `net_up` | `yellow`, `pink`, `tertiary` |
 
-Missing or broken `scheme.json` → Everforest (`name=everforest-fallback`). That saved me a few times when Caelestia had not written the file yet at boot.
-
 ## Watch loop
 
 `SchemeWatcher` compares mtime. No inotify.
@@ -50,25 +56,13 @@ while not stop:
     # render + send to the panel
 ```
 
-`renderer.py` paints from `self.palette`. That is the whole story.
+Compared to the others: Cursor and SDDM ride a `postHook`, Zen has its own systemd unit, TURZX just keeps reading the same JSON the desktop already writes.
 
 ## Run it
 
 ```bash
 systemctl --user enable --now turzx-dashboard.service
 ```
-
-Caelestia already updates `scheme.json` when the wallpaper changes. TURZX only has to be running.
-
-## Check
-
-```bash
-jq '.name, .colours.primary, .colours.background' ~/.local/state/caelestia/scheme.json
-```
-
-Change wallpaper. Within about a second the cards and bars should shift. No restart.
-
-Compared to the others: Cursor and SDDM ride a `postHook`, Zen has its own systemd unit, TURZX just keeps reading the same JSON the desktop already writes.
 
 ## Copies in this folder
 

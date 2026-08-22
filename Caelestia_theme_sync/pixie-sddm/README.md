@@ -1,13 +1,23 @@
 # Pixie SDDM follows Caelestia
 
-This is the login greeter at `/usr/share/sddm/themes/pixie-caelestia/`. Same wallpaper and colours as the desktop, so logging out does not dump you onto a random stock theme.
+Login greeter at `/usr/share/sddm/themes/pixie-caelestia/`. Same wallpaper and colours as the desktop so logout does not dump you onto a stock theme.
 
-Upstream theme: [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm). My greeter is a user-owned fork of that (`pixie` → `pixie-caelestia`) so Caelestia can rewrite wallpaper and colours without fighting package ownership.
+Not the Caelestia session drawer (that is Hyprland-only). Greeter monitor layout: [login screen monitor mismatch](../../Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/). Session logout: [logout button](../../Loging%20screen%20and%20logout%20button/logout-button/).
 
-It is not the Caelestia session drawer. That one only exists after Hyprland is up. See [logout button](../../Loging%20screen%20and%20logout%20button/logout-button/) for that. Monitor layout for this greeter is in [login screen monitor mismatch](../../Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/).
+## Catch up in 60 seconds
+
+User-owned fork of [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm) so sync can rewrite `theme.conf` and `assets/background.jpg` without fighting package ownership.
+
+```bash
+systemctl --user is-active caelestia-sddm-sync.service
+~/.local/bin/caelestia-sddm-sync
+cat /usr/share/sddm/themes/pixie-caelestia/theme.conf
+```
+
+One-time clone if a package update clobbers the theme: `~/.local/bin/caelestia-sddm-setup`
 
 | Piece | Path |
-|--------|------|
+|-------|------|
 | Theme | `/usr/share/sddm/themes/pixie-caelestia/` |
 | Sync | `~/.local/bin/caelestia-sddm-sync` |
 | Setup (once) | `~/.local/bin/caelestia-sddm-setup` |
@@ -18,13 +28,13 @@ It is not the Caelestia session drawer. That one only exists after Hyprland is u
 
 ## One-time setup
 
-Stock Pixie sits under `/usr/share/sddm/themes/pixie` and is owned by root. Sync needs to rewrite `theme.conf` and the background on every wallpaper change, so I keep a user-owned fork:
+Stock Pixie sits under `/usr/share/sddm/themes/pixie` and is owned by root. Sync needs to rewrite `theme.conf` and the background on every wallpaper change:
 
 ```bash
 ~/.local/bin/caelestia-sddm-setup
 ```
 
-It copies `pixie` → `pixie-caelestia`, chowns it to me, and points SDDM at the copy. Re-run if a `pixie-sddm` package update clobbers things.
+Copies `pixie` → `pixie-caelestia`, chowns it to me, points SDDM at the copy. Re-run if a `pixie-sddm` package update clobbers things.
 
 ## What sync writes
 
@@ -46,22 +56,15 @@ Missing keys fall back to accent `#A9C78F`, background `#1A1C18`, text `#E3E3DC`
 
 ## How it stays updated
 
-User service watches the state dir:
-
 ```bash
 systemctl --user enable --now caelestia-sddm-sync.service
 ```
 
-`ExecStart` is `caelestia-sddm-sync --watch`. That uses `inotifywait` on `scheme.json`, `path.txt`, and `current`.
+`ExecStart` is `caelestia-sddm-sync --watch`. Uses `inotifywait` on `scheme.json`, `path.txt`, and `current`.
 
 Wallpaper `postHook` also fires a one-shot sync next to the cursor script, so you do not wait on inotify alone.
 
 ## Check
-
-```bash
-~/.local/bin/caelestia-sddm-sync
-cat /usr/share/sddm/themes/pixie-caelestia/theme.conf
-```
 
 Change wallpaper. `assets/background.jpg` and the three colour fields should match Caelestia. Log out once to see the greeter for real.
 

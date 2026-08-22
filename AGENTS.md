@@ -9,7 +9,7 @@
 - Prefers Caelestia's live dynamic scheme to drive TURZX colours, Cursor theme, Zen Browser UI, and the SDDM greeter wallpaper + palette. No separate fixed themes.
 - Prefers the Caelestia session / logout drawer on the left main monitor (DP-3), not the right display.
 - Fish interactive shell: home-wide fzf file launcher on Ctrl-F; cwd fzf on Ctrl-T after loading `fzf_key_bindings` in `~/.config/fish/config.fish`.
-- Prefers diary topics as `README.md` (GitHub-visible) with related config files copied into the same topic folder; avoid hardcoding machine-specific Zen profile directory names in checks/docs.
+- Prefers diary topics as `README.md` (GitHub-visible) with related config files copied into the same topic folder; avoid hardcoding machine-specific Zen profile directory names in checks/docs. Full write-up process: `.cursor/diary-writing.md` (local, gitignored).
 - Prefers speedtest on the TURZX panel only (no desktop overlay). Super+Shift+F toggles; press again to abort.
 - Interested in higher TURZX refresh where feasible: dual-rate on JPEG/PNG for always-on; H.264 clip path is proven for a later live-encoder experiment.
 

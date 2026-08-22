@@ -1,17 +1,28 @@
 # Login screen monitor mismatch
 
-After login, Hyprland had DP-3 on the left and HDMI on the right. At the SDDM password screen I had to move *right* to reach the physically *left* monitor. Annoying every single boot.
+Aug 2026. After login, Hyprland had DP-3 left and HDMI right. At the SDDM password screen I had to move *right* to reach the physically *left* monitor.
 
-This is not the Caelestia session drawer issue. That only exists once Hyprland is running. See [logout button](../logout-button/).
+Not the Caelestia session drawer (Hyprland only). See [logout button](../logout-button/).
+
+## Catch up in 60 seconds
+
+Greeter runs `kwin_wayland` as `sddm`, not Hyprland. Without a greeter layout, kwin follows DRM order: HDMI enumerated before DP-3 on this NVIDIA box → greeter primary on the wrong screen.
+
+**Fix:** `/var/lib/sddm/.config/kwinoutputconfig.json` pins DP-3 at `(0,0)`.
+
+```bash
+~/.local/bin/caelestia-sddm-monitors   # sudo; copies staged JSON into /var/lib/sddm/.config/
+```
+
+Log out and confirm password UI is on DP-3 (left). If Plasma overwrote the file, re-run the helper.
 
 | Piece | Detail |
 |--------|--------|
-| Greeter | SDDM Wayland + `kwin_wayland`, theme `pixie-caelestia` (from [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm)) |
-| Drop-in | `/etc/sddm.conf.d/10-wayland-matugen.conf` |
-| Monitors | DP-3 2560×1440 left/main at `(0,0)`; HDMI-A-1 1920×1080 right at `(2560,0)` |
+| Greeter | SDDM Wayland + `kwin_wayland`, theme `pixie-caelestia` |
+| Monitors | DP-3 2560×1440 left `(0,0)`; HDMI-A-1 1920×1080 right `(2560,0)` |
 | GPU | NVIDIA RTX 4070 SUPER |
 
-Hyprland layout after login (`~/.config/caelestia/hypr-user.lua`):
+Hyprland layout (`~/.config/caelestia/hypr-user.lua`):
 
 ```lua
 hl.monitor({ output = "DP-3", position = "0x0", ... })
@@ -20,8 +31,6 @@ hl.monitor({ output = "HDMI-A-1", position = "2560x0", ... })
 
 ## Cause
 
-The greeter runs `kwin_wayland` as user `sddm`, not Hyprland. With no greeter-specific layout, kwin follows DRM connector order.
-
 On this machine both outputs sit on NVIDIA `card1`:
 
 ```text
@@ -29,16 +38,12 @@ card1-HDMI-A-1  connected   (enumerated first)
 card1-DP-3      connected
 ```
 
-So the greeter treated HDMI as left/primary. Opposite of Hyprland.
-
 Things that do not help on Wayland SDDM:
 
 - `xrandr` / `/usr/share/sddm/scripts/Xsetup`
 - `PrimaryScreen=` in `sddm.conf`
 
 ## Fix: `kwinoutputconfig.json` for the greeter
-
-Same idea as Plasma's `~/.config/kwinoutputconfig.json`, but owned by `sddm`:
 
 | Monitor | Position | Priority | Role |
 |---------|----------|----------|------|
@@ -51,26 +56,14 @@ Installed at:
 /var/lib/sddm/.config/kwinoutputconfig.json
 ```
 
-Staged copy and installer on this machine:
+Staged copy:
 
 ```text
 ~/.local/share/caelestia-sddm-kwinoutputconfig.json
 ~/.local/bin/caelestia-sddm-monitors
 ```
 
-```bash
-~/.local/bin/caelestia-sddm-monitors
-```
-
-Uses sudo. Copies the staged JSON into `/var/lib/sddm/.config/`.
-
-Theme and colour helpers are separate. Wallpaper/palette sync is in [pixie-sddm](../../Caelestia_theme_sync/pixie-sddm/).
-
-| Helper | Role |
-|--------|------|
-| `~/.local/bin/caelestia-sddm-setup` | Clone `pixie-caelestia`, set `Current=` |
-| `~/.local/bin/caelestia-sddm-sync` | Sync wallpaper + palette from Caelestia |
-| `caelestia-sddm-sync.service` | User service for live sync |
+Greeter colours/wallpaper: [pixie-sddm](../../Caelestia_theme_sync/pixie-sddm/).
 
 ## Config map
 
@@ -81,19 +74,10 @@ Theme and colour helpers are separate. Wallpaper/palette sync is in [pixie-sddm]
 | Hyprland monitor positions | `~/.config/caelestia/hypr-user.lua` |
 | Greeter layout helper | `~/.local/bin/caelestia-sddm-monitors` |
 
-## Check
-
-1. Log out or reboot to the greeter.
-2. Password / user UI should be on DP-3 (left).
-3. HDMI should sit to the right of DP-3, same as in Hyprland.
-4. Log in and confirm Hyprland layout is unchanged.
-
-If Plasma "Apply SDDM settings" overwrites `kwinoutputconfig.json`, re-run `caelestia-sddm-monitors`.
-
 ## Pitfalls
 
 - Focusing DP-3 for the Caelestia session drawer does not fix the greeter. Different compositor, different config.
-- Match greeter positions to Hyprland (`0x0` + `2560x0`). Do not copy Plasma scale (e.g. 1.25) unless you want that at login.
+- Match greeter positions to Hyprland (`0x0` + `2560x0`). Do not copy Plasma scale unless you want that at login.
 - Pixie `Main.qml` uses a fixed `1920×1080` root size. kwin still places that surface from the greeter primary/output layout.
 
 ## Copies in this folder

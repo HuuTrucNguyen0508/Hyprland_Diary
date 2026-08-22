@@ -1,8 +1,21 @@
 # Orca / Cursor theme flash and revert
 
-2026-08-19
+2026-08-19. Theme flashed for a split second on open, then the background went black again. After an Orca restart, existing tabs kept the theme. New terminal tabs did not. Cursor had a similar auto-theme override.
 
-Theme flashed for a split second on open, then the background went black again. After an Orca restart, existing tabs kept the theme. New terminal tabs did not. Cursor had a similar auto-theme override.
+## Catch up in 60 seconds
+
+**Cause:** Fish printed Caelestia OSC sequences (`~/.local/state/caelestia/sequences.txt`) into every new tab, painting over Orca/Cursor terminal themes. Cursor also had `window.autoDetectColorScheme: true`.
+
+**Fix:** Skip sequences when `TERM_PROGRAM` is `Orca` or `vscode`. Turn off Cursor auto-detect.
+
+```fish
+# In ~/.config/fish/config.fish — guard around sequences.txt cat
+if test "$TERM_PROGRAM" != "Orca"; and test "$TERM_PROGRAM" != "vscode"
+    cat ~/.local/state/caelestia/sequences.txt 2> /dev/null
+end
+```
+
+Fully quit and reopen Orca/Cursor after editing.
 
 ## Causes
 
@@ -22,11 +35,11 @@ That file dumps OSC sequences, including `OSC 11` background `rgb:0c/0f/0b`. Eve
 
 ### Orca itself was fine
 
-Profile already had `terminalThemeDark: "Everforest Dark"` and `leftSidebarAppearanceMode: "match-terminal"` in `~/.config/orca/profiles/local-default/orca-data.json`. Missing Orca theme config was not the bug. The shell was.
+Profile already had `terminalThemeDark: "Everforest Dark"` in `orca-data.json`. Missing Orca theme config was not the bug. The shell was.
 
 ## Changes
 
-### Cursor: stop auto scheme detection
+### Cursor
 
 `~/.config/Cursor/User/settings.json`:
 
@@ -36,38 +49,15 @@ Profile already had `terminalThemeDark: "Everforest Dark"` and `leftSidebarAppea
 }
 ```
 
-### Fish: skip Caelestia sequences in Orca and Cursor terminals
+### Fish
 
-`~/.config/fish/config.fish`
-
-Before:
-
-```fish
-# Custom colours
-cat ~/.local/state/caelestia/sequences.txt 2> /dev/null
-```
-
-After:
-
-```fish
-# Custom colors from Caelestia; skip in Orca/Cursor terminals so
-# their own terminal themes are not overridden on new tabs.
-if test "$TERM_PROGRAM" != "Orca"; and test "$TERM_PROGRAM" != "vscode"
-    cat ~/.local/state/caelestia/sequences.txt 2> /dev/null
-end
-```
-
-Orca terminals report `TERM_PROGRAM=Orca`.
-
-### Restart Orca
-
-Restarted so runtime picked up cleanly. Old PID `60811` → new PID `66739`. Runtime checked: `state: ready`, `graph: ready`.
+Guard around the sequences cat (see catch-up block above).
 
 ## Check
 
-1. Fully quit and reopen Orca (and Cursor if it is open).
-2. Open a new terminal tab. Background should match the Orca terminal theme (Everforest Dark here), not Caelestia's forced black.
-3. In Cursor, the theme should stop flipping after startup.
+1. Fully quit and reopen Orca (and Cursor if open).
+2. New terminal tab: background should match Orca terminal theme, not Caelestia's forced black.
+3. Cursor theme should stop flipping after startup.
 
 ## Paths
 
@@ -80,10 +70,9 @@ Restarted so runtime picked up cleanly. Old PID `60811` → new PID `66739`. Run
 
 ## Optional follow-ups I did not do
 
-- If Orca has a "follow system theme" toggle and things still drift, turn that off by hand.
 - Pin an explicit Cursor theme with `"workbench.colorTheme": "<your theme>"`.
 - Restrict Caelestia sequences to specific terminals only (foot/kitty) if you want that elsewhere.
-- Fish syntax noise from Orca's preflight script (`ORCA_CODEX_LAUNCH_PREFLIGHT`) is a separate issue. It does not break this theme fix.
+- Fish syntax noise from Orca's preflight script is a separate issue.
 
 ## Copies in this folder
 

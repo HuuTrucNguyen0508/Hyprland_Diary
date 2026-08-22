@@ -1,17 +1,27 @@
 # Zen Browser follows Caelestia
 
-Zen does not speak Caelestia natively. A small Fish watcher rewrites CSS variables into the profile chrome whenever `scheme.json` changes. Toolbar and tabs follow the wallpaper. Page content does not. That is a different problem.
+Zen does not speak Caelestia natively. `caelestia-zen-sync` rewrites CSS variables into each profile's `chrome/` folder when `scheme.json` changes. Toolbar and tabs follow the wallpaper. Page content does not.
+
+## Catch up in 60 seconds
+
+Service watches `~/.local/state/caelestia/` and regenerates `caelestia-colors.css`. **Full Zen restart** required after a wallpaper change. Colours lag a few seconds even then.
+
+```bash
+systemctl --user is-active caelestia-zen-sync.service   # expect: active
+systemctl --user restart caelestia-zen-sync.service
+cat ~/.config/zen/*/chrome/caelestia-colors.css
+```
+
+Needs `fish`, `jq`, `inotify-tools`. Profile must have `toolkit.legacyUserProfileCustomizations.stylesheets = true` in `user.js`.
 
 | Piece | Path |
-|--------|------|
-| Profile chrome | `~/.config/zen/ch69h9y3.Default (release)/chrome/` |
+|-------|------|
+| Profile chrome | `~/.config/zen/<profile>/chrome/` |
 | Generated vars | `chrome/caelestia-colors.css` |
 | Rules you edit | `chrome/userChrome.css` |
 | Sync script | `~/.local/bin/caelestia-zen-sync` |
 | Service | `caelestia-zen-sync.service` |
 | Scheme | `~/.local/state/caelestia/scheme.json` |
-
-Needs `fish`, `jq`, and `inotify-tools`.
 
 ## Profile prefs
 
@@ -64,18 +74,12 @@ systemctl --user enable --now caelestia-zen-sync.service
 
 On start it writes CSS once, then `inotifywait -m` on `~/.local/state/caelestia` and regenerates when `scheme.json` lands.
 
-## Caveats right now
+## Caveats
 
-- Zen does not pick up the new chrome CSS live. You need a full restart of Zen after a wallpaper / scheme change.
-- That restart can take a bit before the new colours show. Same kind of lag as the cursor theme: the sync wrote the file, the app just catches up slowly.
+- Zen does not pick up the new chrome CSS live. Quit fully and reopen after a scheme change.
+- Restart can take a bit before the new colours show. Same lag as the cursor theme.
 
 ## Check
-
-```bash
-systemctl --user restart caelestia-zen-sync.service
-# whatever profile you use under ~/.config/zen/
-cat ~/.config/zen/*/chrome/caelestia-colors.css
-```
 
 Change wallpaper, quit Zen fully, open it again, give it a moment, then look at the toolbar.
 
