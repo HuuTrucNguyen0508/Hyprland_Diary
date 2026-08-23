@@ -1,10 +1,12 @@
 # TURZX refresh upgrade spike
 
+Benchmark notes: how fast can this USB panel refresh when you send full JPEG frames? Useful if you are wondering whether partial updates or firmware changes are worth chasing.
+
 Aug 2026. Can this TURZX (`1cbe:0080`) get a snappier refresh, or are we stuck uploading full compressed frames?
 
 **Short answer:** ~5 fps full-frame JPEG ceiling on USB. Dirty-rect on the public library path is a no-go. H.264 on stock firmware works and became the opt-in live encoder. Shipped dual-rate + dirty skip: [host-engine-refresh](../host-engine-refresh/).
 
-## Catch up in 60 seconds
+## Start here
 
 Stop the dashboard before any USB probe. Port is exclusive.
 

@@ -1,10 +1,12 @@
 # Pixie SDDM follows Caelestia
 
-Login greeter at `/usr/share/sddm/themes/pixie-caelestia/`. Same wallpaper and colours as the desktop so logout does not dump you onto a stock theme.
+Keeps the SDDM login screen wallpaper and colours in sync with the desktop Caelestia scheme, so logout does not dump you onto a stock greeter theme.
+
+Login greeter at `/usr/share/sddm/themes/pixie-caelestia/`.
 
 Not the Caelestia session drawer (that is Hyprland-only). Greeter monitor layout: [login screen monitor mismatch](../../Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/). Session logout: [logout button](../../Loging%20screen%20and%20logout%20button/logout-button/).
 
-## Catch up in 60 seconds
+## Start here
 
 User-owned fork of [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm) so sync can rewrite `theme.conf` and `assets/background.jpg` without fighting package ownership.
 

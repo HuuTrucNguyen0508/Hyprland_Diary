@@ -1,10 +1,10 @@
 # TURZX ambient screens
 
-Added Aug 2026. When nothing more urgent is on the panel, the TURZX cycles terminal toys instead of the stats dashboard. Game mode, a peek hotkey, or speedtest yanks the cards back.
+When the USB panel has nothing urgent to show, it cycles terminal apps (weather, ascii art) instead of the stats dashboard. This entry covers that rotation, plus hotkeys that pull the stats view back.
 
-Live code: `~/Documents/dashboard`. Copies in this folder are snapshots only.
+Added Aug 2026. Live code: `~/Documents/dashboard`. Copies in this folder are snapshots only.
 
-## Catch up in 60 seconds
+## Start here
 
 **Normal day:** stats cards at 1 Hz when you are at the desktop. When you walk away from that, the panel rotates weathr (5 min) → weatherspect (5 min) → asciiquarium (5 min).
 

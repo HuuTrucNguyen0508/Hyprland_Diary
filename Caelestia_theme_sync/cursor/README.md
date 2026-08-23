@@ -1,8 +1,10 @@
 # Cursor follows Caelestia
 
+Caelestia picks colours from the wallpaper. This entry wires the mouse pointer theme to that palette so it does not stay on a fixed Catppuccin accent.
+
 Caelestia has a live dynamic scheme. Catppuccin cursors do not. `caelestia-cursor` grabs the primary colour, picks the nearest Catppuccin Mocha accent, and applies it to Hyprland + GTK.
 
-## Catch up in 60 seconds
+## Start here
 
 Wallpaper change → `postHook` runs the script → pointer theme updates (not always instant). Session start: delayed run in `execs.lua` after Caelestia writes `scheme.json`.
 

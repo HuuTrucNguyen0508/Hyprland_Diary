@@ -1,10 +1,12 @@
 # TURZX custom firmware explore
 
+Research on whether custom panel firmware is realistic on this hardware. Spoiler: host-side tricks were enough; flashing the daily-driver panel was not worth the brick risk.
+
 Aug 2026. Can we flash custom firmware on this 8" TUR_USB panel (`1cbe:0080`), and would it help the live dashboard?
 
 **Short answer:** No for the panel you actually use. Host-side wins (dual-rate JPEG, opt-in H.264) are enough. Firmware RE needs a spare unit and is brick-risky with no known recovery image.
 
-## Catch up in 60 seconds
+## Start here
 
 Do not flash the production panel. `turzx-dashboard.service` depends on stock firmware behaviour.
 

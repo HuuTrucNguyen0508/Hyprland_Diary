@@ -1,10 +1,12 @@
 # Login screen monitor mismatch
 
+SDDM put the password field on the wrong physical monitor. Hyprland was fine after login; only the greeter was wrong.
+
 Aug 2026. After login, Hyprland had DP-3 left and HDMI right. At the SDDM password screen I had to move *right* to reach the physically *left* monitor.
 
 Not the Caelestia session drawer (Hyprland only). See [logout button](../logout-button/).
 
-## Catch up in 60 seconds
+## Start here
 
 Greeter runs `kwin_wayland` as `sddm`, not Hyprland. Without a greeter layout, kwin follows DRM order: HDMI enumerated before DP-3 on this NVIDIA box → greeter primary on the wrong screen.
 

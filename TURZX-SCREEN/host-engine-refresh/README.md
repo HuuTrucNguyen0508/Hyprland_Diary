@@ -1,14 +1,14 @@
 # TURZX host-engine refresh
 
-Aug 2026. The always-on dashboard loop: dual-rate JPEG to USB, logical dirty skip, shared top metrics plate, speedtest gauges at full USB speed. H.264 live encoding exists but stays opt-in.
+How the always-on dashboard pushes frames to the USB panel: refresh rate, skipping unchanged pixels, and an optional H.264 path. Read this after [Process](../Process/) if you care about performance, not orientation.
 
-Built on [refresh upgrade spike](../refresh-upgrade-spike/) measurements (~5 fps full-frame ceiling on JPEG; dirty-rect USB does not help on the public library path).
+Aug 2026. Built on [refresh upgrade spike](../refresh-upgrade-spike/) measurements (~5 fps full-frame ceiling on JPEG; dirty-rect USB does not help on the public library path).
 
 Live code: `~/Documents/dashboard`. Copies here drift; trust live paths.
 
 ![Shared top-plate preview](preview-shared-plate.png)
 
-## Catch up in 60 seconds
+## Start here
 
 **Boot default:** `turzx-dashboard.service` pushes JPEG frames over USB at ~1 Hz when idle. Caelestia scheme changes burst to 0.25 s for 8 s. Speedtest and ambient modes ignore dirty skip and repaint every frame they need.
 

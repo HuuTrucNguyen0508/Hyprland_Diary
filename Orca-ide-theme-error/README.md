@@ -1,8 +1,10 @@
 # Orca / Cursor theme flash and revert
 
+Orca and Cursor terminal tabs flashed the right theme, then went black on new tabs. The shell was injecting Caelestia colour sequences on every tab open.
+
 2026-08-19. Theme flashed for a split second on open, then the background went black again. After an Orca restart, existing tabs kept the theme. New terminal tabs did not. Cursor had a similar auto-theme override.
 
-## Catch up in 60 seconds
+## Start here
 
 **Cause:** Fish printed Caelestia OSC sequences (`~/.local/state/caelestia/sequences.txt`) into every new tab, painting over Orca/Cursor terminal themes. Cursor also had `window.autoDetectColorScheme: true`.
 

@@ -1,10 +1,12 @@
 # TURZX 8" screen: what actually made it work
 
+If your Turing / TURZX USB panel shows a sideways strip or stuck vendor wallpaper on Linux, start here. This is the orientation and USB-size bring-up story.
+
 USB `1cbe:0080` TURZX1.0, 8" panel, mounted landscape-wide. Custom dashboard at `~/Documents/dashboard`. USB driver / protocol code comes from [turing-smart-screen-python](https://github.com/mathoudebine/turing-smart-screen-python) (local clone at `~/Documents/turing-smart-screen-python`, TUR_USB revision).
 
 This screen lied to me a lot.
 
-## Catch up in 60 seconds
+## Start here
 
 Draw at **1280×800**, library sends **800×1280** on USB (`ROTATE_270`, do not disable). Wrong size → sideways strip + TURZX V2 wallpaper ghost.
 

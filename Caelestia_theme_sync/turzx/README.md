@@ -1,10 +1,12 @@
 # TURZX follows Caelestia
 
-No separate sync service. The dashboard reads `~/.local/state/caelestia/scheme.json` every frame (~1 Hz idle). Wallpaper change → next tick picks up new colours.
+The USB panel card colours track the same `scheme.json` file as the rest of the desktop. No separate sync daemon.
 
 USB orientation and letterbox: [TURZX Process](../../TURZX-SCREEN/Process/). Ambient / game mode / speedtest views: [host-engine-refresh](../../TURZX-SCREEN/host-engine-refresh/).
 
-## Catch up in 60 seconds
+## Start here
+
+The dashboard reads `~/.local/state/caelestia/scheme.json` every frame (~1 Hz idle). Change wallpaper → colours update on the next tick. No restart.
 
 ```bash
 systemctl --user is-active turzx-dashboard.service

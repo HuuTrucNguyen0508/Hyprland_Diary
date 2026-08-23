@@ -1,70 +1,105 @@
 # Hyprland diary
 
-Notes from moving Windows → Hyprland on CachyOS. Stack: [Caelestia](https://github.com/caelestia-dots/caelestia) dots, Hyprland, Fish. SDDM greeter is [pixie-sddm](https://github.com/xCaptaiN09/pixie-sddm), forked locally as `pixie-caelestia` for wallpaper + palette sync.
+Troubleshooting notes from one desktop: CachyOS, [Hyprland](https://hyprland.org/), [Caelestia](https://github.com/caelestia-dots/caelestia) dots. I wrote these while fixing  bugs. This is not an install guide or a maintained app, just stuff I got fiddling around and thus wants to keep a memory of it. Could very well be a work on my machine type of shit. 
 
-The TURZX 8" USB panel uses [turing-smart-screen-python](https://github.com/mathoudebine/turing-smart-screen-python) on the wire. The face you actually look at is a custom PIL dashboard in `~/Documents/dashboard`, not the stock Turing UI.
+**You might find this useful if you:**
 
-Each folder has a `README.md` plus copies of the configs/scripts that entry talks about. **Live paths win** if a copy drifted.
+- Run a TURZX / Turing USB smart screen on Linux and want a custom dashboard
+- Use Caelestia on Hyprland and need the greeter, browser, or cursor to follow the wallpaper
+- Hit SDDM on the wrong monitor, or logout leaving a black screen instead of the login UI
 
-## Start here after a long break
+## How this repo is organized
 
-**What runs on boot**
+One folder = one problem or feature. Each folder has:
 
-| Service | What it does |
-|---------|----------------|
-| `turzx-dashboard.service` | TURZX glass: stats cards, or ambient terminal apps, or speedtest gauges |
-| `caelestia-sddm-sync.service` | Greeter wallpaper/colours from Caelestia scheme |
+- `README.md` — what broke, what fixed it, commands to check it
+- Copied configs and scripts — snapshot of what was on my machine when I wrote the entry
 
-**TURZX in one breath:** 1280×800 dashboard → library rotates 270° → **800×1280** on USB. Never skip that rotate. Details: [Process](./TURZX-SCREEN/Process/).
+Paths use `~` (my home directory). **If a copy here disagrees with a live file on disk, trust the live file.** The diary is a paper trail, not something you clone and run.
 
-**What the panel shows today (priority order):**
+## Terms you will see
+
+
+| Term            | Meaning                                                            |
+| --------------- | ------------------------------------------------------------------ |
+| Hyprland        | Wayland compositor / window manager                                |
+| Caelestia       | Dotfiles + Quickshell bar and session UI for Hyprland              |
+| TURZX           | 8" USB side monitor (Turing, USB id `1cbe:0080`, TUR_USB protocol) |
+| `scheme.json`   | Colour palette Caelestia generates from the wallpaper              |
+| SDDM            | Login screen before your desktop session                           |
+| Greeter         | Same as SDDM (runs kwin on Wayland here, not Hyprland)             |
+| pixie-caelestia | Local SDDM theme; wallpaper and colours synced from Caelestia      |
+
+
+## TURZX panel (if that is why you are here)
+
+Most of this repo is about a small USB screen beside the keyboard. It uses [turing-smart-screen-python](https://github.com/mathoudebine/turing-smart-screen-python) on the wire. The UI is a custom Python dashboard in `~/Documents/dashboard` on my machine (not shipped in this repo). Code snapshots live under `TURZX-SCREEN/`.
+
+**Rotation rule that bites everyone:** draw at 1280×800, the library rotates 270° before USB, the panel receives 800×1280. Skip that step and you get a sideways strip plus leftover vendor wallpaper. Details: [Process](./TURZX-SCREEN/Process/).
+
+**What the panel shows (highest priority wins):**
 
 1. Speedtest gauges while a run is active (`Super+Shift+F`)
-2. Stats cards for 10s after `Super+Shift+D` (peek)
+2. Stats cards for 10 s after `Super+Shift+D` (peek)
 3. Stats cards while gaming (fullscreen Steam/Proton/Lutris, or Caelestia game-mode toggle)
 4. Otherwise ambient rotation: weathr → weatherspect → asciiquarium (5 min each; `Super+Shift+N` skips)
 
-**Sanity check**
+**Services on my machine:**
+
+
+| Service                       | Role                                      |
+| ----------------------------- | ----------------------------------------- |
+| `turzx-dashboard.service`     | Drives the USB panel                      |
+| `caelestia-sddm-sync.service` | Keeps greeter wallpaper + colours in sync |
+
 
 ```bash
-systemctl --user is-active turzx-dashboard.service   # expect: active
-journalctl --user -u turzx-dashboard.service -n 3 --no-pager   # expect: SEND: (800, 1280) … LANDSCAPE
-qs -c caelestia ipc call gameMode isEnabled   # manual toggle; fullscreen games flip stats without this
+systemctl --user is-active turzx-dashboard.service
+journalctl --user -u turzx-dashboard.service -n 3 --no-pager   # expect: SEND: (800, 1280)
 ```
 
-**Where the code lives:** `~/Documents/dashboard/` (canonical). Diary snapshots under `TURZX-SCREEN/`.
-
-## Entries
+## Browse by topic
 
 ### TURZX smart screen
 
-| Read this | When you need |
-|-----------|----------------|
-| [Process](./TURZX-SCREEN/Process/) | Orientation, USB 800×1280, why the glass lied about landscape |
-| [Host-engine refresh](./TURZX-SCREEN/host-engine-refresh/) | Dual-rate loop, dirty skip, shared top plate, H.264 opt-in |
-| [Ambient screens](./TURZX-SCREEN/ambient-screens/) | weathr / weatherspect / asciiquarium, game mode, peek binds |
-| [Refresh upgrade spike](./TURZX-SCREEN/refresh-upgrade-spike/) | Measured ~5 fps JPEG ceiling, probe scripts, H.264 go/no-go notes |
-| [Custom firmware explore](./TURZX-SCREEN/custom-firmware-explore/) | Why we did not flash the panel |
-| [Speedtest widget](./Speedtest-widget/) | `Super+Shift+F`, Fast.com engine, state JSON |
-| [TURZX colours](./Caelestia_theme_sync/turzx/) | Scheme from `scheme.json`, no extra sync service |
+
+| Folder                                                             | Read if you want to…                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [Process](./TURZX-SCREEN/Process/)                                 | Fix sideways image, stuck TURZX V2 wallpaper, wrong orientation     |
+| [Host-engine refresh](./TURZX-SCREEN/host-engine-refresh/)         | Understand the always-on refresh loop, dirty skip, H.264 experiment |
+| [Ambient screens](./TURZX-SCREEN/ambient-screens/)                 | Run terminal ambient apps, game mode, peek hotkey                   |
+| [Refresh upgrade spike](./TURZX-SCREEN/refresh-upgrade-spike/)     | See measured USB fps ceiling and probe scripts                      |
+| [Custom firmware explore](./TURZX-SCREEN/custom-firmware-explore/) | Know why flashing the panel was ruled out                           |
+| [Speedtest widget](./Speedtest-widget/)                            | Wire speedtest to the panel only (`Super+Shift+F`)                  |
+| [TURZX colours](./Caelestia_theme_sync/turzx/)                     | Match panel card colours to the Caelestia wallpaper                 |
+
 
 ### Caelestia theme sync
 
-| Read this | When you need |
-|-----------|----------------|
-| [Cursor](./Caelestia_theme_sync/cursor/) | Catppuccin cursor from scheme primary |
-| [Zen Browser](./Caelestia_theme_sync/zen-browser/) | Profile chrome CSS sync |
-| [Pixie SDDM](./Caelestia_theme_sync/pixie-sddm/) | Greeter wallpaper + palette |
+Caelestia picks colours from the wallpaper. These entries hook other apps into `scheme.json`.
+
+
+| Folder                                             | Read if you want to…                     |
+| -------------------------------------------------- | ---------------------------------------- |
+| [Cursor](./Caelestia_theme_sync/cursor/)           | Pointer theme from scheme primary colour |
+| [Zen Browser](./Caelestia_theme_sync/zen-browser/) | Zen toolbar colours from scheme          |
+| [Pixie SDDM](./Caelestia_theme_sync/pixie-sddm/)   | Login screen wallpaper + palette         |
+
 
 ### Login / session
 
-| Read this | When you need |
-|-----------|----------------|
-| [Login screen monitor mismatch](./Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/) | Greeter on wrong monitor |
-| [Logout button](./Loging%20screen%20and%20logout%20button/logout-button/) | Ctrl+Alt+Delete logout → greeter (`hyprshutdown --vt 1`) |
+
+| Folder                                                                                                    | Read if you want to…                      |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [Login screen monitor mismatch](./Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/) | Password UI on the wrong physical monitor |
+| [Logout button](./Loging%20screen%20and%20logout%20button/logout-button/)                                 | Logout → black screen instead of greeter  |
+
 
 ### Other
 
-| Read this | When you need |
-|-----------|----------------|
-| [Orca theme + Caelestia](./Orca-ide-theme-error/) | Fish OSC sequences overriding Orca/Cursor terminal bg |
+
+| Folder                                            | Read if you want to…                                  |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| [Orca theme + Caelestia](./Orca-ide-theme-error/) | Fish shell overriding Orca/Cursor terminal background |
+
+

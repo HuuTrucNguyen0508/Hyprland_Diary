@@ -1,8 +1,10 @@
 # Logout button fix
 
-Aug 2026. Ctrl+Alt+Delete opened the Caelestia session menu, but Logout either did nothing or left a black screen. Lock (`SUPER+L`) is unrelated.
+Ctrl+Alt+Delete opened the session menu, but Logout either did nothing or left a black screen instead of returning to SDDM.
 
-## Catch up in 60 seconds
+Aug 2026. Lock (`SUPER+L`) is a separate issue and is not covered here.
+
+## Start here
 
 **Working logout today:** `hyprshutdown --vt 1` via `shell.json`, session UI forced onto DP-3 before opening.
 

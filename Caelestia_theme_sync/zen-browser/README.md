@@ -1,8 +1,10 @@
 # Zen Browser follows Caelestia
 
+Zen has no native Caelestia hook. This entry syncs toolbar/tab chrome colours from `scheme.json` via generated CSS in each profile.
+
 Zen does not speak Caelestia natively. `caelestia-zen-sync` rewrites CSS variables into each profile's `chrome/` folder when `scheme.json` changes. Toolbar and tabs follow the wallpaper. Page content does not.
 
-## Catch up in 60 seconds
+## Start here
 
 Service watches `~/.local/state/caelestia/` and regenerates `caelestia-colors.css`. **Full Zen restart** required after a wallpaper change. Colours lag a few seconds even then.
 
