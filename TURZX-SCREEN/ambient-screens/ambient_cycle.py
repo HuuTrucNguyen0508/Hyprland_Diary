@@ -13,7 +13,7 @@ STATE_PATH = Path.home() / ".local" / "state" / "turzx" / "ambient.json"
 SLOT_SECONDS = 300.0
 
 AMBIENT_SLOTS: tuple[tuple[str, list[str], int, int], ...] = (
-    ("weathr", ["weathr", "--metric", "--hide-hud", "--hide-location", "--silent"], 80, 24),
+    ("weathr", ["weathr", "--metric", "--hide-location", "--silent"], 80, 24),
     ("weatherspect", ["weatherspect"], 80, 24),
     ("asciiquarium", ["asciiquarium"], 80, 24),
 )

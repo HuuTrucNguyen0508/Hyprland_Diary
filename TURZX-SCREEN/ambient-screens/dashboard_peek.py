@@ -1,9 +1,12 @@
-"""Watch ~/.local/state/turzx/dashboard_peek.json for a temporary stats view."""
+"""Watch ~/.local/state/turzx/dashboard_peek.json for a sticky stats latch.
+
+Super+Shift+D toggles `{ "enabled": true|false }`. While enabled, the panel
+stays on the stats dashboard until the shortcut is pressed again. No timer.
+"""
 
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,11 +15,11 @@ STATE_PATH = Path.home() / ".local" / "state" / "turzx" / "dashboard_peek.json"
 
 @dataclass(frozen=True)
 class DashboardPeekState:
-    until: float | None = None
+    enabled: bool = False
 
     @property
     def visible(self) -> bool:
-        return self.until is not None and self.until > time.time()
+        return self.enabled
 
 
 def load_dashboard_peek(path: Path = STATE_PATH) -> DashboardPeekState | None:
@@ -28,14 +31,10 @@ def load_dashboard_peek(path: Path = STATE_PATH) -> DashboardPeekState | None:
         return None
     if not isinstance(data, dict):
         return None
-    until_raw = data.get("until")
-    if until_raw is None:
-        return None
-    try:
-        until = float(until_raw)
-    except (TypeError, ValueError):
-        return None
-    return DashboardPeekState(until=until)
+    if "enabled" in data:
+        return DashboardPeekState(enabled=bool(data.get("enabled")))
+    # Legacy timed peek ({"until": ...}) — treat as off so we don't stick forever.
+    return None
 
 
 class DashboardPeekWatcher:
@@ -52,6 +51,6 @@ class DashboardPeekWatcher:
         if mtime != self._mtime:
             self._mtime = mtime
             self.state = load_dashboard_peek(self.path) if mtime is not None else None
-        if self.state is not None and not self.state.visible:
-            return None
-        return self.state if self.state and self.state.visible else None
+        if self.state is not None and self.state.visible:
+            return self.state
+        return None

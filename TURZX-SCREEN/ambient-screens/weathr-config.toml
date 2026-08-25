@@ -1,4 +1,4 @@
-hide_hud = true
+hide_hud = false
 silent = true
 
 [location]

@@ -18,9 +18,6 @@ from library.lcd.lcd_comm import Orientation  # noqa: E402
 from library.lcd.lcd_comm_turing_usb import LcdCommTuringUSB  # noqa: E402
 
 from frame_dirty import BusyTracker, logical_dirty_key  # noqa: E402
-from ambient_cycle import AmbientCycle  # noqa: E402
-from dashboard_peek import DashboardPeekWatcher  # noqa: E402
-from game_mode import GameModeWatcher  # noqa: E402
 from renderer import DashboardRenderer, HEIGHT, WIDTH  # noqa: E402
 from settings import SettingsWatcher  # noqa: E402
 from speedtest_state import SpeedtestWatcher  # noqa: E402
@@ -46,7 +43,6 @@ PANEL_W, PANEL_H = NATIVE_WIDTH, NATIVE_HEIGHT
 
 VIEW_SPEEDTEST = "speedtest"
 VIEW_STATS = "stats"
-VIEW_AMBIENT = "ambient"
 
 
 def rotate_clockwise(image: Image.Image, degrees: int) -> Image.Image:
@@ -176,12 +172,6 @@ def parse_args() -> argparse.Namespace:
         help="Sleep between frames while speedtest is on glass (default: 0 = ASAP / USB max)",
     )
     parser.add_argument(
-        "--ambient-interval",
-        type=float,
-        default=0.0,
-        help="Extra sleep between ambient frames (default: 0; poll() already waits ~0.2s on script output)",
-    )
-    parser.add_argument(
         "--brightness",
         type=int,
         default=None,
@@ -235,14 +225,33 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+
+def open_lcd() -> LcdCommTuringUSB:
+    """Open / re-open the TURZX USB handle (needed after hub blips)."""
+    lcd = LcdCommTuringUSB(
+        com_port="AUTO",
+        display_width=NATIVE_WIDTH,
+        display_height=NATIVE_HEIGHT,
+    )
+    lcd.InitializeComm()
+    lcd.SetOrientation(LCD_ORIENTATION)
+    return lcd
+
+
+def close_lcd(lcd: LcdCommTuringUSB | None) -> None:
+    if lcd is None:
+        return
+    try:
+        lcd.closeSerial()
+    except Exception as exc:
+        print(f"USB close ignored: {exc}")
+
+
 def main() -> int:
     args = parse_args()
     scheme = SchemeWatcher()
     settings_watch = SettingsWatcher()
     speedtest_watch = SpeedtestWatcher()
-    peek_watch = DashboardPeekWatcher()
-    game_mode_watch = GameModeWatcher()
-    ambient = AmbientCycle()
     renderer = DashboardRenderer(FONT_DIR, palette=scheme.palette)
     collector = StatsCollector()
     busy = BusyTracker()
@@ -258,44 +267,40 @@ def main() -> int:
 
     lcd: LcdCommTuringUSB | None = None
     applied_brightness = -1
+    usb_backoff_s = 1.0
+    last_view: str | None = None
     if not args.preview:
-        lcd = LcdCommTuringUSB(
-            com_port="AUTO",
-            display_width=NATIVE_WIDTH,
-            display_height=NATIVE_HEIGHT,
-        )
-        lcd.InitializeComm()
-        lcd.SetOrientation(LCD_ORIENTATION)
         print(f"palette={scheme.palette.name}")
+        print("views=stats,speedtest (ambient off)")
+        try:
+            lcd = open_lcd()
+            print("USB connected")
+        except Exception as exc:
+            print(f"USB open failed ({exc}); retrying")
 
     try:
         while not stop:
             renderer.palette = scheme.poll()
             settings = settings_watch.poll()
             speed_state = speedtest_watch.poll()
-            peek_state = peek_watch.poll()
-            game_mode = game_mode_watch.poll()
 
+            # Priority: speedtest overlay, otherwise always-on stats.
+            # Ambient / peek / game-mode flips were resetting USB on the shared hub.
             if speed_state is not None and speed_state.visible:
                 view = VIEW_SPEEDTEST
-            elif peek_state is not None:
-                view = VIEW_STATS
-            elif game_mode:
-                view = VIEW_STATS
             else:
-                view = VIEW_AMBIENT
+                view = VIEW_STATS
 
-            stats_active = view == VIEW_STATS
-            collector.set_active(stats_active)
-            ambient.set_active(view == VIEW_AMBIENT)
+            if view != last_view:
+                print(f"view {last_view or '-'} -> {view}")
+                if last_view is not None:
+                    time.sleep(0.35)
+                last_view = view
+                last_dirty = None
 
-            speed_visible = bool(speed_state is not None and speed_state.visible)
-            ambient_visible = view == VIEW_AMBIENT
-
+            speed_visible = view == VIEW_SPEEDTEST
             if speed_visible:
                 interval = args.speedtest_interval
-            elif ambient_visible:
-                interval = args.ambient_interval
             elif busy.is_busy(False):
                 interval = args.busy_interval
             else:
@@ -306,14 +311,13 @@ def main() -> int:
                 lcd.SetBrightness(brightness)
                 applied_brightness = brightness
 
-            stats = collector.poll(settings) if stats_active else collector.poll()
+            stats = collector.poll(settings)
             busy.note_palette(renderer.palette)
             dirty = logical_dirty_key(renderer.palette, speed_state, stats, view=view)
 
             if (
                 dirty == last_dirty
                 and not speed_visible
-                and not ambient_visible
                 and not args.once
                 and not args.preview
             ):
@@ -322,8 +326,6 @@ def main() -> int:
 
             if speed_state is not None:
                 layout = renderer.render_speedtest(speed_state)
-            elif view == VIEW_AMBIENT:
-                layout = renderer.render_terminal(ambient.poll())
             else:
                 layout = renderer.render(stats)
 
@@ -353,8 +355,31 @@ def main() -> int:
             if args.preview:
                 frame.save(args.output)
                 print(f"Saved {args.output} paste=({paste_x},{paste_y})")
-            elif lcd is not None:
-                lcd.DisplayPILImage(frame)
+            elif lcd is None:
+                time.sleep(usb_backoff_s)
+                try:
+                    lcd = open_lcd()
+                    usb_backoff_s = 1.0
+                    last_dirty = None
+                    print("USB reconnected")
+                except Exception as reopen_exc:
+                    print(f"USB reconnect failed: {reopen_exc}")
+                    usb_backoff_s = min(30.0, usb_backoff_s * 2)
+                continue
+            else:
+                try:
+                    lcd.DisplayPILImage(frame)
+                    usb_backoff_s = 1.0
+                except Exception as exc:
+                    # Stale handle after USB blip — reopen instead of spinning on Errno 19
+                    print(f"USB display failed ({exc}); reconnecting in {usb_backoff_s:.0f}s")
+                    close_lcd(lcd)
+                    lcd = None
+                    applied_brightness = -1
+                    last_dirty = None
+                    time.sleep(usb_backoff_s)
+                    usb_backoff_s = min(30.0, usb_backoff_s * 2)
+                    continue
 
             last_dirty = dirty
 
@@ -365,10 +390,8 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        ambient.close()
         collector.close()
-        if lcd is not None:
-            lcd.closeSerial()
+        close_lcd(lcd)
 
     return 0
 

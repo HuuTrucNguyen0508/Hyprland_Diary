@@ -1,23 +1,14 @@
 # TURZX ambient screens
 
-When the USB panel has nothing urgent to show, it cycles terminal apps (weather, ascii art) instead of the stats dashboard. This entry covers that rotation, plus hotkeys that pull the stats view back.
+Terminal apps on the USB panel (weathr, weatherspect, asciiquarium). This is how that path was built. **It is off the boot dashboard as of Aug 2026.** JPEG ambient plus view flips reset the panel on the hub shared with USB audio. Live loop is stats cards plus `Super+Shift+F` speedtest only. See [usb-stability](../usb-stability/) and [host-engine-refresh](../host-engine-refresh/).
 
-Added Aug 2026. Live code: `~/Documents/dashboard`. Copies in this folder are snapshots only.
+Code still sits in `~/Documents/dashboard` (`ambient_cycle.py`, `term_capture.py`, peek scripts) if you want it later. `dashboard.py` no longer imports it.
 
 ## Start here
 
-**Normal day:** stats cards at 1 Hz when you are at the desktop. When you walk away from that, the panel rotates weathr (5 min) → weatherspect (5 min) → asciiquarium (5 min).
+**Normal day now:** stats cards at 1 Hz. `Super+Shift+F` overlays Fast.com gauges, then cards return.
 
-**Overrides (highest wins):**
-
-| You do / what happens | Panel shows |
-|------------------------|-------------|
-| `Super+Shift+F` speedtest running | Dual gauges, full USB speed |
-| `Super+Shift+D` | Stats cards for 10 s (press again to extend) |
-| Fullscreen game (Proton/Steam/Lutris) or Caelestia game-mode toggle | Stats cards |
-| None of the above | Ambient app |
-
-**Hotkeys:** `Super+Shift+D` peek stats · `Super+Shift+N` next ambient app · `Super+Shift+F` speedtest (see [Speedtest widget](../../Speedtest-widget/)).
+`Super+Shift+D` and `Super+Shift+N` are unbound. Peek and next-ambient scripts remain under `~/.config/hypr/scripts/` but do nothing unless you wire them again.
 
 **Restart after code edits:**
 
@@ -25,43 +16,36 @@ Added Aug 2026. Live code: `~/Documents/dashboard`. Copies in this folder are sn
 systemctl --user restart turzx-dashboard.service
 ```
 
-**Quick checks:**
+**Quick checks (only useful if you re-enable ambient):**
 
 ```bash
-# Which ambient slot is active?
 cat ~/.local/state/turzx/ambient.json
-
-# Is game mode logic firing? (fullscreen ZZZ → true even if Caelestia toggle is off)
-python3 -c "import sys; sys.path.insert(0,'$HOME/Documents/dashboard'); from game_mode import GameModeWatcher; print(GameModeWatcher()._read_enabled())"
-
-# Black ambient app? Almost always TERM=dumb or wrong capture path — see troubleshooting below.
+cat ~/.local/state/turzx/dashboard_peek.json
 ```
 
-## Ambient rotation
+Black ambient app was almost always `TERM=dumb` or the wrong capture path. Troubleshooting is below.
+
+## Ambient rotation (unused)
 
 `ambient_cycle.py` keeps a 5 min timer in `~/.local/state/turzx/ambient.json`:
 
-1. weathr — `weathr --metric --hide-hud --hide-location --silent`
+1. weathr — `weathr --metric --hide-location --silent` (HUD stripped from the top row and drawn beside the house)
 2. weatherspect — `weatherspect`
 3. asciiquarium — `asciiquarium`
 
-`ambient_next.sh` (bound to `Super+Shift+N`) bumps the slot index and resets the timer. The dashboard kills and respawns the capture process on the next poll.
+`ambient_next.sh` used to be bound to `Super+Shift+N`. It still bumps the slot index if you run it by hand.
 
-While ambient is showing, bonsai and `nvidia-smi` polling pause to save CPU.
+While ambient was showing, bonsai and `nvidia-smi` polling paused to save CPU.
 
-## Game mode
+Idle frames get a colour lift in `render_terminal()` (black floor → charcoal, then brightness/contrast via a cached LUT). That is separate from LCD brightness (`turzx-ctl brightness`). Tune `AMBIENT_LIFT_FLOOR` / `AMBIENT_BRIGHTNESS` / `AMBIENT_CONTRAST` in `renderer.py` if it still looks muddy.
 
-Stats on the panel while you play. `game_mode.py` returns true if any of these match:
+## Game mode (disabled)
 
-1. Caelestia toggle — `qs -c caelestia ipc call gameMode isEnabled` prints `true`
-2. Fullscreen game on Hyprland — `hyprctl clients -j`, any client with `fullscreen >= 1` and class starting with `steam_app_`, `gamescope`, `lutris`, or `heroic` (ZZZ shows up as `steam_app_default`)
-3. Shell dead fallback — Hypr animations off and tearing on
+`game_mode.py` still exists. Auto ambient ↔ stats on game open/close reset the USB panel, so the loop never reads it.
 
-Item 2 exists because the Caelestia toggle is manual. Proton games never flipped it for you.
+## Sticky dashboard latch (disabled)
 
-## Dashboard peek
-
-`toggle_dashboard_peek.sh` writes `{ "until": <now + 10> }` to `~/.local/state/turzx/dashboard_peek.json`. Repeat press pushes `until` forward another 10 s.
+`toggle_dashboard_peek.sh` still flips `{ "enabled": true|false }` in `~/.local/state/turzx/dashboard_peek.json`. The live loop ignores that file. Stats are always on unless speedtest is running.
 
 ## Terminal capture (why this was painful)
 
@@ -80,6 +64,7 @@ Gotchas we hit:
 - Inherited `TERM=dumb` from the service environment → curses barely painted. Force `xterm-256color` inside the shell command, not only in `Popen` env.
 - `--ambient-interval 0` on the dashboard loop. `poll()` already waits ~0.2 s on `select`. An extra sleep broke animation timing.
 - Grid is 80×24. `render_terminal()` in `renderer.py` stretches cells to 1280×800.
+- weathr draws its HUD on row 1; at 24 rows that line sits above the house and was easy to lose when the frame was tightened. The dashboard strips that row and redraws condition + temp / wind + precip as two larger lines beside the house.
 
 ## App config
 
@@ -91,7 +76,7 @@ Gotchas we hit:
 
 ## Hypr binds
 
-Live file: `~/.config/caelestia/hypr-user.lua`. Snippet: [`hypr-user-binds.lua`](hypr-user-binds.lua).
+Live file: `~/.config/caelestia/hypr-user.lua`. Snippet: [`hypr-user-binds.lua`](hypr-user-binds.lua) (speedtest only).
 
 After editing binds: `hyprctl reload`
 
@@ -118,5 +103,6 @@ Python modules, Hypr scripts, weathr config, bind snippet.
 ## Related
 
 - [Host-engine refresh](../host-engine-refresh/) — main dashboard loop, speedtest ASAP mode
+- [USB stability](../usb-stability/) — why ambient left the boot path
 - [Speedtest widget](../../Speedtest-widget/) — `Super+Shift+F`
 - [Process](../Process/) — USB orientation if the glass looks sideways

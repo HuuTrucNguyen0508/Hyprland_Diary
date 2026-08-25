@@ -15,7 +15,7 @@ systemctl --user restart turzx-dashboard.service
 journalctl --user -u turzx-dashboard.service -n 3 --no-pager   # expect SEND: (800, 1280)
 ```
 
-Live code: `~/Documents/dashboard/`. Ambient / game mode / speedtest: [ambient-screens](../ambient-screens/).
+Live code: `~/Documents/dashboard/`. Speedtest overlay: [Speedtest widget](../../Speedtest-widget/). Ambient (unused): [ambient-screens](../ambient-screens/).
 
 ![Working TURZX dashboard preview](../Photo/preview.png)
 

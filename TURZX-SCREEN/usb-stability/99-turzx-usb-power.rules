@@ -1,0 +1,4 @@
+# TURZX panel: keep device + parent hub awake. Autosuspend on the shared hub
+# (audio + panel) was resetting 1cbe:0080 under ambient JPEG load / view flips.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0080", ATTR{power/control}="on", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0080", RUN+="/bin/sh -c 'echo on > /sys$env{DEVPATH}/../power/control; echo -1 > /sys$env{DEVPATH}/../power/autosuspend'"

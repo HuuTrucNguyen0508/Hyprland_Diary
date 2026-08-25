@@ -40,9 +40,9 @@ Most of this repo is about a small USB screen beside the keyboard. It uses [turi
 **What the panel shows (highest priority wins):**
 
 1. Speedtest gauges while a run is active (`Super+Shift+F`)
-2. Stats cards for 10 s after `Super+Shift+D` (peek)
-3. Stats cards while gaming (fullscreen Steam/Proton/Lutris, or Caelestia game-mode toggle)
-4. Otherwise ambient rotation: weathr → weatherspect → asciiquarium (5 min each; `Super+Shift+N` skips)
+2. Otherwise the stats dashboard (~1 Hz)
+
+Ambient rotation, peek (`Super+Shift+D`), and auto game-mode view flips are off. They reset USB on this hub. History: [ambient-screens](./TURZX-SCREEN/ambient-screens/), [usb-stability](./TURZX-SCREEN/usb-stability/).
 
 **Services on my machine:**
 
@@ -67,7 +67,8 @@ journalctl --user -u turzx-dashboard.service -n 3 --no-pager   # expect: SEND: (
 | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | [Process](./TURZX-SCREEN/Process/)                                 | Fix sideways image, stuck TURZX V2 wallpaper, wrong orientation     |
 | [Host-engine refresh](./TURZX-SCREEN/host-engine-refresh/)         | Understand the always-on refresh loop, dirty skip, H.264 experiment |
-| [Ambient screens](./TURZX-SCREEN/ambient-screens/)                 | Run terminal ambient apps, game mode, peek hotkey                   |
+| [Ambient screens](./TURZX-SCREEN/ambient-screens/)                 | Old weathr/curses path (off boot; USB instability)                  |
+| [USB stability](./TURZX-SCREEN/usb-stability/)                     | Hub resets, reconnect, why ambient left the loop                    |
 | [Refresh upgrade spike](./TURZX-SCREEN/refresh-upgrade-spike/)     | See measured USB fps ceiling and probe scripts                      |
 | [Custom firmware explore](./TURZX-SCREEN/custom-firmware-explore/) | Know why flashing the panel was ruled out                           |
 | [Speedtest widget](./Speedtest-widget/)                            | Wire speedtest to the panel only (`Super+Shift+F`)                  |
@@ -100,6 +101,7 @@ Caelestia picks colours from the wallpaper. These entries hook other apps into `
 
 | Folder                                            | Read if you want to…                                  |
 | ------------------------------------------------- | ----------------------------------------------------- |
+| [Caelestia launcher (Flow-style)](./Caelestia-launcher-flow/) | Super launcher with files, calc, windows, PATH runner, URLs |
 | [Orca theme + Caelestia](./Orca-ide-theme-error/) | Fish shell overriding Orca/Cursor terminal background |
 
 

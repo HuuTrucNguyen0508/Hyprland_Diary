@@ -10,9 +10,9 @@ Live code: `~/Documents/dashboard`. Copies here drift; trust live paths.
 
 ## Start here
 
-**Boot default:** `turzx-dashboard.service` pushes JPEG frames over USB at ~1 Hz when idle. Caelestia scheme changes burst to 0.25 s for 8 s. Speedtest and ambient modes ignore dirty skip and repaint every frame they need.
+**Boot default:** `turzx-dashboard.service` pushes JPEG frames over USB at ~1 Hz when idle. Caelestia scheme changes burst to 0.25 s for 8 s. Speedtest ignores dirty skip and repaints every frame.
 
-**What you see** depends on view priority (speedtest → peek → game mode → ambient). Ambient details: [ambient-screens](../ambient-screens/).
+**What you see:** stats cards, or Fast.com gauges while `Super+Shift+F` is running. Ambient / peek / game-mode views are off. Notes on the old path: [ambient-screens](../ambient-screens/), [usb-stability](../usb-stability/).
 
 **Restart:**
 
@@ -39,11 +39,10 @@ journalctl --user -u turzx-dashboard.service -n 5 --no-pager | rg 'SEND|palette'
 | Idle | 1.0 s (`--idle-interval`) | Yes |
 | Scheme burst (8 s after palette change) | 0.25 s (`--busy-interval`) | Yes |
 | Speedtest gauges | 0 (`--speedtest-interval`) | No |
-| Ambient terminal | 0 extra (`--ambient-interval`; capture waits in `poll()`) | No |
 
 Busy burst fires when Caelestia scheme name/hash changes. Speedtest runs flat out (~4.7–5 fps measured). Idle stays cheap on CPU.
 
-Fingerprint skips USB when unchanged: scheme identity, speedtest fields, clock minute, rounded stats. View name is in the fingerprint so ambient ↔ stats always repaints.
+Fingerprint skips USB when unchanged: scheme identity, speedtest fields, clock minute, rounded stats. View name is in the fingerprint so stats ↔ speedtest always repaints.
 
 Wire size stays **800×1280**: `CONTENT_ROTATE = 0`, `Orientation.LANDSCAPE`, stock library `ROTATE_270`. Do not skip library rotate. [Process](../Process/) explains why.
 
@@ -51,9 +50,9 @@ Wire size stays **800×1280**: `CONTENT_ROTATE = 0`, `Orientation.LANDSCAPE`, st
 
 CPU, GPU, RAM, and the picture card share one rounded plate with vertical dividers. Four separate cards used to share a bottom edge; H.264 turned that into a full-width line through the sparklines.
 
-## Ambient + stats views
+## Views
 
-Same service, different render path. Stats use `renderer.render()`. Ambient uses `render_terminal()` on an 80×24 ANSI grid. See [ambient-screens](../ambient-screens/).
+Same service. Stats use `renderer.render()`. Speedtest uses `render_speedtest()`. Terminal ambient (`render_terminal()`) is unused. See [ambient-screens](../ambient-screens/).
 
 ## Service
 
@@ -97,7 +96,7 @@ Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 | Layout | `~/Documents/dashboard/renderer.py` |
 | Orientation | `~/Documents/dashboard/turzx_screen.py` |
 | Speedtest state | `~/Documents/dashboard/speedtest_state.py` |
-| Ambient / capture / game mode | [ambient-screens](../ambient-screens/) |
+| Ambient / capture / game mode (unused) | [ambient-screens](../ambient-screens/) |
 | Service | `~/.config/systemd/user/turzx-dashboard.service` |
 | H.264 toggle | `~/.config/hypr/scripts/toggle_h264_live.sh` |
 | Speedtest bind | [Speedtest widget](../../Speedtest-widget/) |
@@ -107,13 +106,13 @@ Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 
 | File | Role |
 |------|------|
-| `dashboard.py` | Loop + view priority |
+| `dashboard.py` | Loop (stats + speedtest) |
 | `frame_dirty.py` | Fingerprint + scheme burst |
-| `renderer.py` | Stats layout + `render_terminal` |
-| `ambient_cycle.py` | Ambient rotation |
-| `term_capture.py` | `script` capture |
-| `game_mode.py` | Game detection |
-| `dashboard_peek.py` | Peek state |
+| `renderer.py` | Stats layout (`render_terminal` unused) |
+| `ambient_cycle.py` | Old ambient rotation (unused) |
+| `term_capture.py` | `script` capture (unused) |
+| `game_mode.py` | Game detection (unused) |
+| `dashboard_peek.py` | Peek state (unused) |
 | `turzx-dashboard.service` | Unit snapshot |
 | `turzx_h264_live.py`, `h264_usb.py` | H.264 experiment |
 | `toggle_h264_live.sh` | JPEG ↔ H.264 |
@@ -123,5 +122,6 @@ Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 
 - [Process](../Process/) — orientation / stock rotate
 - [Refresh upgrade spike](../refresh-upgrade-spike/) — fps ceiling, probes
-- [Ambient screens](../ambient-screens/) — terminal apps, binds, black-screen traps
+- [Ambient screens](../ambient-screens/) — old terminal path, why it left boot
+- [USB stability](../usb-stability/) — hub resets, reconnect
 - [Speedtest widget](../../Speedtest-widget/) — `Super+Shift+F`
