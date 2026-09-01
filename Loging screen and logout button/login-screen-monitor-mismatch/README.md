@@ -31,6 +31,8 @@ hl.monitor({ output = "DP-3", position = "0x0", ... })
 hl.monitor({ output = "HDMI-A-1", position = "2560x0", ... })
 ```
 
+Hyprland workspace numbering at login (separate issue, same HDMI-first enumeration): [Monitor workspace defaults](../../Monitor-workspace-defaults/).
+
 ## Cause
 
 On this machine both outputs sit on NVIDIA `card1`:

@@ -93,6 +93,7 @@ Caelestia picks colours from the wallpaper. These entries hook other apps into `
 | Folder                                                                                                    | Read if you want to…                      |
 | --------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | [Login screen monitor mismatch](./Loging%20screen%20and%20logout%20button/login-screen-monitor-mismatch/) | Password UI on the wrong physical monitor |
+| [Monitor workspace defaults](./Monitor-workspace-defaults/) | Main monitor on ws 1, secondary on ws 2 at Hyprland login |
 | [Logout button](./Loging%20screen%20and%20logout%20button/logout-button/)                                 | Logout → black screen instead of greeter  |
 
 
