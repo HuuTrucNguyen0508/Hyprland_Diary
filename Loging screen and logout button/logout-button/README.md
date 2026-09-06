@@ -43,9 +43,9 @@ Session drawer stuck to whichever monitor had focus. Focus HDMI → Logout on th
 
 ## Fixes
 
-### Logout command
+### Logout / power commands
 
-`~/.config/caelestia/shell.json`:
+`~/.config/caelestia/shell.json` wraps each session action with `~/.local/bin/graceful-quit-helium` first. Helium (Chromium) treats compositor teardown as a crash and offers tab restore; Alt+F4 is the same clean path as Super+Q / the window X.
 
 ```json
 "session": {
@@ -53,13 +53,28 @@ Session drawer stuck to whichever monitor had focus. Focus HDMI → Logout on th
         "logout": [
             "sh",
             "-c",
-            "command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown --vt 1 -t 'Logging out...' || hyprctl dispatch 'hl.dsp.exit()'"
+            "$HOME/.local/bin/graceful-quit-helium; command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown --vt 1 -t 'Logging out...' || hyprctl dispatch 'hl.dsp.exit()'"
+        ],
+        "shutdown": [
+            "sh",
+            "-c",
+            "$HOME/.local/bin/graceful-quit-helium; systemctl poweroff"
+        ],
+        "reboot": [
+            "sh",
+            "-c",
+            "$HOME/.local/bin/graceful-quit-helium; systemctl reboot"
+        ],
+        "hibernate": [
+            "sh",
+            "-c",
+            "$HOME/.local/bin/graceful-quit-helium; systemctl hibernate"
         ]
     }
 }
 ```
 
-`--vt 1` jumps back to the SDDM greeter VT. That stopped the NVIDIA black screen for me.
+`--vt 1` on logout jumps back to the SDDM greeter VT. That stopped the NVIDIA black screen for me.
 
 ### Always open session on DP-3
 
@@ -81,20 +96,27 @@ Disable session on HDMI: `~/.config/caelestia/monitors/HDMI-A-1/shell.json` → 
 | Concern | Path |
 |---------|------|
 | Session keybind + focus DP-3 | `~/.config/hypr/hyprland/keybinds.lua`, `~/.config/hypr/variables.lua` |
-| Logout command | `~/.config/caelestia/shell.json` → `session.commands.logout` |
+| Logout / shutdown / reboot / hibernate | `~/.config/caelestia/shell.json` → `session.commands.*` |
+| Helium polite quit before power actions | `~/.local/bin/graceful-quit-helium` |
 | Disable session on HDMI | `~/.config/caelestia/monitors/HDMI-A-1/shell.json` |
 
 ## Pitfalls
 
 - Do not confuse reboot with logout.
 - Prefer `hyprshutdown --vt 1` / `hl.dsp.exit()` over bare logind `Terminate` on this NVIDIA + SDDM Wayland stack.
+- Do not use `hyprctl dispatch windowclose` / `hl.dsp.window.close()` on Helium. That sets `exit_type = Crashed` and asks to restore tabs next launch.
 
 ## Copies in this folder
 
 | File | Live path |
 |------|-----------|
 | `shell.json` | `~/.config/caelestia/shell.json` |
+| `graceful-quit-helium` | `~/.local/bin/graceful-quit-helium` |
 | `variables.lua` | `~/.config/hypr/variables.lua` |
 | `hypr-vars.lua` | `~/.config/caelestia/hypr-vars.lua` |
 | `keybinds.lua` | `~/.config/hypr/hyprland/keybinds.lua` |
 | `HDMI-A-1-shell.json` | `~/.config/caelestia/monitors/HDMI-A-1/shell.json` |
+
+## Related
+
+- Helium vertical tabs follow the focused window's monitor: [Helium hypr layout](../../Helium-hypr-layout/)

@@ -1,0 +1,502 @@
+#!/usr/bin/env python3
+"""Follow Helium between Hyprland monitors and set layout + tab side.
+
+Sets helium.browser.layout and helium.browser.vertical_right_aligned over
+Chromium DevTools on localhost (see ~/.local/bin/helium).
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import socket
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+import websocket
+
+LAYOUT_NAMES = {
+    "classic": 0,
+    "compact": 1,
+    "vertical": 2,
+    "dynamic": 3,
+}
+
+CONFIG_PATH = Path.home() / ".config/helium-hypr-layout/config.json"
+LOCK_PATH = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "helium-hypr-layout.lock"
+STATE_PATH = Path.home() / ".local/state/helium-hypr-layout/state.json"
+DEFAULT_PORT = 9333
+PREF_LAYOUT = "helium.browser.layout"
+PREF_SIDE = "helium.browser.vertical_right_aligned"
+
+
+def log(msg: str) -> None:
+    print(f"helium-hypr-layout: {msg}", flush=True)
+
+
+def load_config() -> dict[str, Any]:
+    cfg: dict[str, Any] = {
+        "debug_port": DEFAULT_PORT,
+        "debounce_ms": 300,
+        "monitors": {
+            "DP-3": {"layout": "vertical", "side": "left"},
+            "HDMI-A-1": {"layout": "vertical", "side": "right"},
+        },
+        "fallback": {"layout": "vertical", "side": "left"},
+    }
+    if CONFIG_PATH.is_file():
+        try:
+            raw = json.loads(CONFIG_PATH.read_text())
+            if isinstance(raw, dict):
+                # Migrate old {"layouts": {"MON": "vertical"}} shape.
+                if "monitors" not in raw and isinstance(raw.get("layouts"), dict):
+                    monitors = {}
+                    for mon, layout in raw["layouts"].items():
+                        monitors[mon] = {"layout": layout, "side": "left"}
+                    raw = {**raw, "monitors": monitors}
+                    raw.pop("layouts", None)
+                if isinstance(raw.get("fallback"), str):
+                    raw["fallback"] = {"layout": raw["fallback"], "side": "left"}
+                cfg.update(raw)
+        except Exception as exc:
+            log(f"config read failed ({exc}); using defaults")
+    return cfg
+
+
+def layout_to_int(value: Any) -> int:
+    if isinstance(value, int):
+        return value
+    name = str(value).strip().lower()
+    if name not in LAYOUT_NAMES:
+        raise ValueError(f"unknown layout {value!r}")
+    return LAYOUT_NAMES[name]
+
+
+def side_to_right_aligned(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    name = str(value).strip().lower()
+    if name in {"right", "r", "true", "1"}:
+        return True
+    if name in {"left", "l", "false", "0"}:
+        return False
+    raise ValueError(f"unknown side {value!r}")
+
+
+def resolve_target(spec: Any, fallback: dict[str, Any]) -> tuple[int, bool]:
+    if isinstance(spec, str) or isinstance(spec, int):
+        layout = layout_to_int(spec)
+        side = side_to_right_aligned(fallback.get("side", "left"))
+        return layout, side
+    if not isinstance(spec, dict):
+        spec = fallback
+    layout = layout_to_int(spec.get("layout", fallback.get("layout", "vertical")))
+    side = side_to_right_aligned(spec.get("side", fallback.get("side", "left")))
+    return layout, side
+
+
+def hypr_runtime_dir() -> Path:
+    sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if not sig:
+        raise RuntimeError("HYPRLAND_INSTANCE_SIGNATURE is unset")
+    base = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "hypr" / sig
+    if not base.is_dir():
+        raise RuntimeError(f"missing hypr runtime dir: {base}")
+    return base
+
+
+def hyprctl_json(command: str) -> Any:
+    sock_path = hypr_runtime_dir() / ".socket.sock"
+    payload = f"j/{command}".encode()
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.connect(str(sock_path))
+        sock.sendall(payload)
+        chunks: list[bytes] = []
+        while True:
+            data = sock.recv(1 << 20)
+            if not data:
+                break
+            chunks.append(data)
+    return json.loads(b"".join(chunks).decode())
+
+
+def monitor_name_by_id() -> dict[int, str]:
+    return {int(m["id"]): str(m["name"]) for m in hyprctl_json("monitors")}
+
+
+def helium_targets(cfg: dict[str, Any]) -> list[tuple[str, int, bool]]:
+    """Return (monitor_name, layout, right_aligned) for Helium windows, focused first."""
+    monitors = cfg.get("monitors") or {}
+    fallback = cfg.get("fallback") or {"layout": "vertical", "side": "left"}
+    if isinstance(fallback, str):
+        fallback = {"layout": fallback, "side": "left"}
+    mons = monitor_name_by_id()
+    rows: list[tuple[int, str, int, bool]] = []
+    for client in hyprctl_json("clients"):
+        cls = str(client.get("class") or client.get("initialClass") or "").lower()
+        if cls != "helium":
+            continue
+        mid = client.get("monitor")
+        try:
+            mon_name = mons[int(mid)]
+        except Exception:
+            continue
+        layout, right = resolve_target(monitors.get(mon_name, fallback), fallback)
+        focus = client.get("focusHistoryID")
+        focus_id = int(focus) if isinstance(focus, int) else 999
+        rows.append((focus_id, mon_name, layout, right))
+    rows.sort(key=lambda r: r[0])
+    return [(mon, layout, right) for _, mon, layout, right in rows]
+
+
+def load_state() -> dict[str, Any]:
+    if not STATE_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(STATE_PATH.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_state(state: dict[str, Any]) -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, indent=2) + "\n")
+
+
+def cdp_http(port: int, path: str) -> Any:
+    url = f"http://127.0.0.1:{port}{path}"
+    with urllib.request.urlopen(url, timeout=1.5) as resp:
+        return json.loads(resp.read().decode())
+
+
+def cdp_call(ws: websocket.WebSocket, method: str, params: dict | None = None, timeout: float = 5.0) -> Any:
+    msg_id = getattr(ws, "_helium_id", 0) + 1
+    ws._helium_id = msg_id  # type: ignore[attr-defined]
+    payload = {"id": msg_id, "method": method}
+    if params:
+        payload["params"] = params
+    ws.send(json.dumps(payload))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        ws.settimeout(max(0.1, deadline - time.monotonic()))
+        raw = ws.recv()
+        data = json.loads(raw)
+        if data.get("id") != msg_id:
+            continue
+        if "error" in data:
+            raise RuntimeError(f"{method}: {data['error']}")
+        return data.get("result")
+    raise TimeoutError(method)
+
+
+def set_prefs_via_cdp(port: int, layout: int, right_aligned: bool) -> None:
+    version = cdp_http(port, "/json/version")
+    browser_ws = version["webSocketDebuggerUrl"]
+    ws = websocket.create_connection(browser_ws, timeout=3)
+    ws._helium_id = 0  # type: ignore[attr-defined]
+    target_id = None
+    try:
+        created = cdp_call(
+            ws,
+            "Target.createTarget",
+            {"url": "chrome://settings/appearance"},
+        )
+        target_id = created["targetId"]
+        attached = cdp_call(
+            ws,
+            "Target.attachToTarget",
+            {"targetId": target_id, "flatten": True},
+        )
+        session_id = attached["sessionId"]
+
+        def session_call(method: str, params: dict | None = None, timeout: float = 8.0) -> Any:
+            msg_id = getattr(ws, "_helium_id", 0) + 1
+            ws._helium_id = msg_id  # type: ignore[attr-defined]
+            payload: dict[str, Any] = {
+                "id": msg_id,
+                "method": method,
+                "sessionId": session_id,
+            }
+            if params:
+                payload["params"] = params
+            ws.send(json.dumps(payload))
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                ws.settimeout(max(0.1, deadline - time.monotonic()))
+                data = json.loads(ws.recv())
+                if data.get("id") != msg_id:
+                    continue
+                if "error" in data:
+                    raise RuntimeError(f"{method}: {data['error']}")
+                return data.get("result")
+            raise TimeoutError(method)
+
+        deadline = time.monotonic() + 8.0
+        while time.monotonic() < deadline:
+            probe = session_call(
+                "Runtime.evaluate",
+                {
+                    "expression": "typeof chrome !== 'undefined' && !!(chrome.settingsPrivate && chrome.settingsPrivate.setPref)",
+                    "returnByValue": True,
+                },
+                timeout=2.0,
+            )
+            if probe and probe.get("result", {}).get("value") is True:
+                break
+            time.sleep(0.15)
+        else:
+            raise RuntimeError("chrome.settingsPrivate not available on settings page")
+
+        right_js = "true" if right_aligned else "false"
+        expression = f"""
+(() => new Promise((resolve, reject) => {{
+  const setPref = (name, value) => new Promise((res, rej) => {{
+    try {{
+      chrome.settingsPrivate.setPref(name, value, () => {{
+        if (chrome.runtime && chrome.runtime.lastError) {{
+          rej(chrome.runtime.lastError.message);
+          return;
+        }}
+        chrome.settingsPrivate.getPref(name, (pref) => {{
+          if (chrome.runtime && chrome.runtime.lastError) {{
+            rej(chrome.runtime.lastError.message);
+            return;
+          }}
+          res(pref && pref.value);
+        }});
+      }});
+    }} catch (err) {{
+      rej(String(err));
+    }}
+  }});
+  (async () => {{
+    const layout = await setPref({PREF_LAYOUT!r}, {layout});
+    const side = await setPref({PREF_SIDE!r}, {right_js});
+    resolve({{ layout, side }});
+  }})().catch(reject);
+}}))()
+"""
+        result = session_call(
+            "Runtime.evaluate",
+            {
+                "expression": expression,
+                "awaitPromise": True,
+                "returnByValue": True,
+            },
+            timeout=8.0,
+        )
+        value = result.get("result", {}).get("value") if result else None
+        if not isinstance(value, dict):
+            raise RuntimeError(f"pref set returned {value!r}")
+        if value.get("layout") != layout:
+            raise RuntimeError(f"layout pref returned {value.get('layout')!r}, expected {layout}")
+        if bool(value.get("side")) != right_aligned:
+            raise RuntimeError(f"side pref returned {value.get('side')!r}, expected {right_aligned}")
+    finally:
+        try:
+            if target_id is not None:
+                cdp_call(ws, "Target.closeTarget", {"targetId": target_id}, timeout=2.0)
+        except Exception:
+            pass
+        ws.close()
+
+
+def write_preferences_fallback(layout: int, right_aligned: bool) -> None:
+    """Best-effort when Helium is not running; used on next cold start."""
+    prefs_path = Path.home() / ".config/net.imput.helium/Default/Preferences"
+    if not prefs_path.is_file():
+        return
+    try:
+        data = json.loads(prefs_path.read_text())
+        browser = data.setdefault("helium", {}).setdefault("browser", {})
+        if browser.get("layout") == layout and browser.get("vertical_right_aligned") == right_aligned:
+            return
+        browser["layout"] = layout
+        browser["vertical_right_aligned"] = right_aligned
+        prefs_path.write_text(json.dumps(data, separators=(",", ":")))
+        log(f"wrote Preferences layout={layout} side={'right' if right_aligned else 'left'}")
+    except Exception as exc:
+        log(f"Preferences write failed: {exc}")
+
+
+def apply_for_monitor(
+    cfg: dict[str, Any],
+    mon_name: str,
+    layout: int,
+    right_aligned: bool,
+    force: bool = False,
+) -> bool:
+    state = load_state()
+    if (
+        not force
+        and state.get("layout") == layout
+        and state.get("right_aligned") == right_aligned
+        and state.get("monitor") == mon_name
+    ):
+        return False
+
+    port = int(cfg.get("debug_port") or DEFAULT_PORT)
+    side = "right" if right_aligned else "left"
+    try:
+        set_prefs_via_cdp(port, layout, right_aligned)
+        state.update(
+            {
+                "layout": layout,
+                "right_aligned": right_aligned,
+                "monitor": mon_name,
+                "via": "cdp",
+                "ts": time.time(),
+            }
+        )
+        state.pop("error", None)
+        save_state(state)
+        log(f"{mon_name} -> vertical/{side}" if layout == 2 else f"{mon_name} -> layout {layout}/{side}")
+        return True
+    except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as exc:
+        write_preferences_fallback(layout, right_aligned)
+        state.update(
+            {
+                "layout": layout,
+                "right_aligned": right_aligned,
+                "monitor": mon_name,
+                "via": "prefs",
+                "ts": time.time(),
+                "error": str(exc),
+            }
+        )
+        save_state(state)
+        log(f"CDP unavailable ({exc}); Preferences updated for next launch")
+        return False
+    except Exception as exc:
+        log(f"failed to set layout: {exc}")
+        return False
+
+
+def reconcile(cfg: dict[str, Any], force: bool = False) -> None:
+    targets = helium_targets(cfg)
+    if not targets:
+        return
+    mon_name, layout, right = targets[0]
+    apply_for_monitor(cfg, mon_name, layout, right, force=force)
+
+
+def interesting_event(name: str) -> bool:
+    return name in {
+        "openwindow",
+        "closewindow",
+        "movewindow",
+        "movewindowv2",
+        "activewindow",
+        "activewindowv2",
+        "focusedmon",
+        "moveworkspace",
+        "moveworkspacev2",
+        "workspace",
+        "workspacev2",
+    }
+
+
+def acquire_lock() -> Any:
+    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fh.close()
+        raise SystemExit(0)
+    fh.write(str(os.getpid()))
+    fh.flush()
+    return fh
+
+
+def run_daemon(cfg: dict[str, Any]) -> None:
+    lock_fh = acquire_lock()
+    debounce = max(50, int(cfg.get("debounce_ms") or 300)) / 1000.0
+    # Poll catches drags/moves that never emit the events we listen for,
+    # and recovers after Helium or this helper was restarted.
+    poll_s = max(0.5, float(cfg.get("poll_seconds") or 1.0))
+    log(f"listening (port {cfg.get('debug_port', DEFAULT_PORT)}, poll {poll_s}s)")
+    reconcile(cfg, force=True)
+
+    while True:
+        try:
+            sock_path = hypr_runtime_dir() / ".socket2.sock"
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.connect(str(sock_path))
+                buf = b""
+                pending = False
+                last_fire = 0.0
+                last_poll = 0.0
+                while True:
+                    sock.settimeout(0.25)
+                    try:
+                        chunk = sock.recv(4096)
+                        if not chunk:
+                            raise ConnectionError("socket2 closed")
+                        buf += chunk
+                        while b"\n" in buf:
+                            line, buf = buf.split(b"\n", 1)
+                            text = line.decode(errors="replace").strip()
+                            if not text or ">>" not in text:
+                                continue
+                            name = text.split(">>", 1)[0]
+                            if interesting_event(name):
+                                pending = True
+                    except socket.timeout:
+                        pass
+
+                    now = time.monotonic()
+                    if pending and (now - last_fire) >= debounce:
+                        pending = False
+                        last_fire = now
+                        try:
+                            reconcile(cfg)
+                        except Exception as exc:
+                            log(f"reconcile error: {exc}")
+                    elif (now - last_poll) >= poll_s:
+                        last_poll = now
+                        try:
+                            reconcile(cfg)
+                        except Exception as exc:
+                            log(f"poll reconcile error: {exc}")
+        except Exception as exc:
+            log(f"event socket error: {exc}; retrying")
+            time.sleep(1.0)
+        finally:
+            _ = lock_fh
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--daemon", action="store_true", help="follow Hyprland events")
+    parser.add_argument("--once", action="store_true", help="apply once for current Helium window")
+    parser.add_argument("--set", choices=sorted(LAYOUT_NAMES), help="force a layout via CDP")
+    parser.add_argument("--side", choices=["left", "right"], help="force tab side with --set")
+    parser.add_argument("--force", action="store_true", help="apply even if state matches")
+    args = parser.parse_args()
+    cfg = load_config()
+
+    if args.set:
+        right = side_to_right_aligned(args.side or "left")
+        apply_for_monitor(cfg, "manual", layout_to_int(args.set), right, force=True)
+        return 0
+    if args.once or not args.daemon:
+        reconcile(cfg, force=args.force or args.once)
+        if not args.daemon:
+            return 0
+    run_daemon(cfg)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        raise SystemExit(0)

@@ -1,0 +1,10 @@
+{
+  "debug_port": 9333,
+  "debounce_ms": 300,
+  "poll_seconds": 1.0,
+  "monitors": {
+    "DP-3": { "layout": "vertical", "side": "left" },
+    "HDMI-A-1": { "layout": "vertical", "side": "right" }
+  },
+  "fallback": { "layout": "vertical", "side": "left" }
+}

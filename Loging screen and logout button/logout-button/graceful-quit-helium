@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Politely quit Helium before session teardown.
+# Compositor close / SIGKILL looks like a crash to Chromium and triggers
+# "Restore pages?". Alt+F4 is the same path as the window X / Super+Q.
+
+set -euo pipefail
+
+TIMEOUT_SEC="${HELIUM_QUIT_TIMEOUT:-5}"
+SETTLE_SEC="${HELIUM_QUIT_SETTLE:-0.4}"
+
+helium_window_count() {
+  hyprctl clients -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    clients = json.load(sys.stdin)
+except Exception:
+    print(0)
+    raise SystemExit
+n = 0
+for c in clients:
+    cls = (c.get("class") or c.get("initialClass") or "").lower()
+    if cls == "helium":
+        n += 1
+print(n)
+'
+}
+
+helium_pids() {
+  hyprctl clients -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    clients = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+seen = set()
+for c in clients:
+    cls = (c.get("class") or c.get("initialClass") or "").lower()
+    if cls != "helium":
+        continue
+    pid = c.get("pid")
+    if isinstance(pid, int) and pid > 1 and pid not in seen:
+        seen.add(pid)
+        print(pid)
+'
+}
+
+alt_f4_one_helium() {
+  # Focus one Helium window and send Alt+F4 (Lua dispatchers on Hyprland 0.56+).
+  # Pass the window object; address strings fail hl.focus with "window not found".
+  hyprctl eval '
+local target = nil
+for _, w in ipairs(hl.get_windows()) do
+  local c = string.lower(w.class or w.initial_class or "")
+  if c == "helium" then
+    target = w
+    break
+  end
+end
+if not target then
+  return
+end
+hl.dispatch(hl.dsp.focus({ window = target }))
+hl.dispatch(hl.dsp.send_shortcut({ mods = "ALT", key = "F4" }))
+' >/dev/null
+}
+
+if ! command -v hyprctl >/dev/null 2>&1; then
+  exit 0
+fi
+
+if [[ "$(helium_window_count)" -eq 0 ]]; then
+  exit 0
+fi
+
+deadline=$((SECONDS + TIMEOUT_SEC))
+while (( SECONDS < deadline )); do
+  count="$(helium_window_count)"
+  if [[ "$count" -eq 0 ]]; then
+    sleep "$SETTLE_SEC"
+    exit 0
+  fi
+  alt_f4_one_helium || true
+  sleep "$SETTLE_SEC"
+done
+
+# Still around: ask the browser process to exit cleanly (not SIGKILL).
+mapfile -t pids < <(helium_pids)
+if ((${#pids[@]})); then
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+  term_deadline=$((SECONDS + 2))
+  while (( SECONDS < term_deadline )); do
+    if [[ "$(helium_window_count)" -eq 0 ]]; then
+      sleep "$SETTLE_SEC"
+      exit 0
+    fi
+    sleep 0.2
+  done
+fi
+
+exit 0
