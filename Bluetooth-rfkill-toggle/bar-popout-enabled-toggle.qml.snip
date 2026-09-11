@@ -1,0 +1,6 @@
+// from modules/bar/popouts/Bluetooth.qml lines 28-32
+    Toggle {
+        label: qsTr("Enabled")
+        checked: BluetoothControl.enabled
+        toggle.onToggled: BluetoothControl.setEnabled(checked)
+    }

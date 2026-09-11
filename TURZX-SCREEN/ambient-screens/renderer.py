@@ -17,6 +17,7 @@ from term_capture import (
     ROWS as TERM_ROWS,
 )
 from theme import Palette, fallback_palette
+from wifi_usage import format_data_bytes
 
 WIDTH = 1280
 HEIGHT = 800
@@ -127,6 +128,7 @@ class DashboardRenderer:
             "value_xl": self._load_font("jetbrains-mono/JetBrainsMono-Bold.ttf", 72),
             "value_md": self._load_font("jetbrains-mono/JetBrainsMono-Bold.ttf", 30),
             "value_sm": self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", 20),
+            "caption": self._load_font("roboto/Roboto-Regular.ttf", 14),
             "mono_xs": self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", 13),
         }
 
@@ -570,6 +572,8 @@ class DashboardRenderer:
         p = self.palette
         self._rounded_rect(draw, (x, y, x + w, y + h), 14, p.panel, p.panel_border)
         draw.text((x + 14, y + 10), "BONSAI", font=self._fonts["label"], fill=p.text)
+        wifi_text = self._wifi_usage_text(stats)
+        draw.text((x + w - 14, y + 10), wifi_text, font=self._fonts["label"], fill=p.muted, anchor="ra")
         art_top = y + 38
         art_h = h - 48
         if not stats.bonsai_lines:
@@ -786,13 +790,26 @@ class DashboardRenderer:
 
     @staticmethod
     def _gpu_detail(stats: DashboardStats) -> str:
-        if stats.gpu_vram_used_mb is None or stats.gpu_vram_total_mb is None:
-            return f"{stats.gpu_temp:.0f}°C" if stats.gpu_temp is not None else "No data"
-        return f"{stats.gpu_vram_used_mb / 1024:.1f} / {stats.gpu_vram_total_mb / 1024:.0f} GB VRAM"
+        parts: list[str] = []
+        if stats.gpu_temp is not None:
+            parts.append(f"{stats.gpu_temp:.0f}°C")
+        if stats.gpu_vram_used_mb is not None and stats.gpu_vram_total_mb is not None:
+            parts.append(
+                f"{stats.gpu_vram_used_mb / 1024:.1f} / {stats.gpu_vram_total_mb / 1024:.0f} GB"
+            )
+        return "  ·  ".join(parts) if parts else "No data"
 
     @staticmethod
     def _format_speed(kbps: float) -> str:
         return f"{kbps / 1024:.1f} MB/s" if kbps >= 1024 else f"{kbps:.0f} KB/s"
+
+    @staticmethod
+    def _wifi_usage_text(stats: DashboardStats) -> str:
+        month = format_data_bytes(stats.wifi_month_bytes)
+        if stats.wifi_month_avg_bytes is None:
+            return f"WiFi {month}"
+        avg = format_data_bytes(stats.wifi_month_avg_bytes)
+        return f"WiFi {month} · avg {avg}"
 
     @staticmethod
     def _format_uptime(seconds: float) -> str:

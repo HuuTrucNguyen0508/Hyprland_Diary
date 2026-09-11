@@ -1,0 +1,8 @@
+// from modules/utilities/cards/Toggles.qml lines 89-95
+                DelegateChoice {
+                    roleValue: "bluetooth"
+                    delegate: Toggle {
+                        icon: "bluetooth"
+                        checked: BluetoothControl.enabled
+                        onClicked: BluetoothControl.toggle()
+                    }

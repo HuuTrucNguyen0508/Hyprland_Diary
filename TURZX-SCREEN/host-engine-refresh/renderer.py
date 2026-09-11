@@ -9,11 +9,52 @@ from PIL import Image, ImageDraw, ImageFont
 
 from speedtest_state import SpeedtestState
 from stats import DashboardStats, PICTURE_CARD_PATH, VolumeStats
-from term_capture import TermFrame, COLS as TERM_COLS, ROWS as TERM_ROWS
+from term_capture import (
+    TermCell,
+    TermFrame,
+    COLS as TERM_COLS,
+    DEFAULT_FG,
+    ROWS as TERM_ROWS,
+)
 from theme import Palette, fallback_palette
+from wifi_usage import format_data_bytes
 
 WIDTH = 1280
 HEIGHT = 800
+
+# weathr HUD overlay (beside the house; 2 lines, larger than grid text)
+WEATHR_HUD_COL = 46
+WEATHR_HUD_ROW_START = 11
+WEATHR_HUD_LINE_GAP = 1.35
+WEATHR_HUD_FONT_SCALE = 1.85
+
+# Idle ambient (weathr / weatherspect / asciiquarium): raise the black floor and
+# nudge midtones so the panel reads without cranking LCD brightness.
+AMBIENT_LIFT_FLOOR = 48
+AMBIENT_BRIGHTNESS = 1.22
+AMBIENT_CONTRAST = 1.12
+
+
+def _build_ambient_lut(
+    floor: int = AMBIENT_LIFT_FLOOR,
+    brightness: float = AMBIENT_BRIGHTNESS,
+    contrast: float = AMBIENT_CONTRAST,
+) -> list[int]:
+    """One-pass LUT: black→charcoal, then brightness + contrast around mid-grey."""
+    lut: list[int] = []
+    mid = 128.0
+    span = 255 - floor
+    for i in range(256):
+        v = floor + (i * span) / 255.0
+        v *= brightness
+        v = mid + (v - mid) * contrast
+        lut.append(min(255, max(0, int(round(v)))))
+    return lut
+
+
+_AMBIENT_LUT = _build_ambient_lut()
+# Pillow RGB point() wants one table per band (256 * 3).
+_AMBIENT_LUT_RGB = _AMBIENT_LUT * 3
 
 # Fallback aliases so letterbox / older imports still have a colour
 _FALLBACK = fallback_palette()
@@ -87,6 +128,7 @@ class DashboardRenderer:
             "value_xl": self._load_font("jetbrains-mono/JetBrainsMono-Bold.ttf", 72),
             "value_md": self._load_font("jetbrains-mono/JetBrainsMono-Bold.ttf", 30),
             "value_sm": self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", 20),
+            "caption": self._load_font("roboto/Roboto-Regular.ttf", 14),
             "mono_xs": self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", 13),
         }
 
@@ -152,6 +194,76 @@ class DashboardRenderer:
 
         return image
 
+    @staticmethod
+    def _parse_weathr_hud(line: str) -> list[str]:
+        """Collapse weathr's status bar into two overlay lines."""
+        if "Weather:" not in line:
+            return []
+        if "Loading" in line:
+            return ["Loading…"]
+        condition = temp = wind = precip = ""
+        for segment in line.split("|"):
+            piece = segment.strip()
+            if piece.startswith("Weather:"):
+                condition = piece.removeprefix("Weather:").strip()
+            elif piece.startswith("Temp:"):
+                temp = piece.removeprefix("Temp:").strip()
+            elif piece.startswith("Wind:"):
+                wind = piece.removeprefix("Wind:").strip()
+            elif piece.startswith("Precip:"):
+                precip = piece.removeprefix("Precip:").strip()
+        lines: list[str] = []
+        top = "  ".join(part for part in (condition, temp) if part)
+        bottom = "  ".join(part for part in (wind, precip) if part)
+        if top:
+            lines.append(top)
+        if bottom:
+            lines.append(bottom)
+        return lines
+
+    @classmethod
+    def _extract_weathr_hud(
+        cls, rows: list[list[TermCell]]
+    ) -> tuple[list[list[TermCell]], list[tuple[str, tuple[int, int, int]]]]:
+        """Pull weathr's top status line off the sky and return overlay text."""
+        if not rows:
+            return rows, []
+        grid = [[TermCell(c.ch, c.fg, c.bg) for c in row] for row in rows]
+        cols = len(grid[0])
+        hud_lines: list[tuple[str, tuple[int, int, int]]] = []
+
+        for row_idx in range(min(3, len(grid))):
+            line = "".join(cell.ch for cell in grid[row_idx])
+            if "Weather:" not in line:
+                continue
+            fg = DEFAULT_FG
+            for cell in grid[row_idx]:
+                if cell.ch.strip():
+                    fg = cell.fg
+                    break
+            for text in cls._parse_weathr_hud(line):
+                hud_lines.append((text, fg))
+            start = line.find("Weather:")
+            end = line.find("Press 'q'")
+            if end >= 0:
+                end += len("Press 'q'")
+            else:
+                end = len(line.rstrip())
+            for col_idx in range(start, min(end, cols)):
+                cell = grid[row_idx][col_idx]
+                grid[row_idx][col_idx] = TermCell(" ", cell.fg, cell.bg)
+
+        return grid, hud_lines
+
+    def _lift_ambient_image(self, image: Image.Image) -> Image.Image:
+        """Remap black→charcoal and lift midtones for idle readability."""
+        return image.point(_AMBIENT_LUT_RGB)
+
+    def ambient_letterbox_bg(self) -> tuple[int, int, int]:
+        """Letterbox fill after the same lift pipeline as ambient frames."""
+        swatch = Image.new("RGB", (1, 1), self.palette.bg)
+        return self._lift_ambient_image(swatch).getpixel((0, 0))
+
     def render_terminal(self, frame: TermFrame) -> Image.Image:
         """Fullscreen colour terminal grid stretched to the panel."""
         p = self.palette
@@ -167,16 +279,20 @@ class DashboardRenderer:
                 fill=p.muted,
                 anchor="mm",
             )
-            return image
+            return self._lift_ambient_image(image)
 
         cols = frame.cols or TERM_COLS
         grid_rows = frame.grid_rows or TERM_ROWS
+        rows = frame.rows
+        weathr_hud: list[tuple[str, tuple[int, int, int]]] = []
+        if frame.label == "weathr":
+            rows, weathr_hud = self._extract_weathr_hud(rows)
         cell_w = WIDTH // cols
         cell_h = HEIGHT // grid_rows
         font_size = max(6, min(cell_w - 1, cell_h - 2))
         font = self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", font_size)
 
-        for row_idx, row in enumerate(frame.rows[:grid_rows]):
+        for row_idx, row in enumerate(rows[:grid_rows]):
             y0 = row_idx * cell_h
             y1 = y0 + cell_h
             if y0 >= HEIGHT:
@@ -195,7 +311,19 @@ class DashboardRenderer:
                 ty = y0 + max(0, (cell_h - font_size) / 2) - 1
                 draw.text((tx, ty), cell.ch, font=font, fill=cell.fg)
 
-        return image
+        if weathr_hud:
+            hud_size = max(font_size + 4, round(font_size * WEATHR_HUD_FONT_SCALE))
+            hud_font = self._load_font("jetbrains-mono/JetBrainsMono-Regular.ttf", hud_size)
+            x = WEATHR_HUD_COL * cell_w + 2
+            y = WEATHR_HUD_ROW_START * cell_h
+            line_h = round(hud_size * WEATHR_HUD_LINE_GAP)
+            for text, fg in weathr_hud:
+                if y + hud_size > HEIGHT:
+                    break
+                draw.text((x, y), text, font=hud_font, fill=fg)
+                y += line_h
+
+        return self._lift_ambient_image(image)
 
     @staticmethod
     def _speedtest_scale(down: float, up: float) -> float:
@@ -444,6 +572,8 @@ class DashboardRenderer:
         p = self.palette
         self._rounded_rect(draw, (x, y, x + w, y + h), 14, p.panel, p.panel_border)
         draw.text((x + 14, y + 10), "BONSAI", font=self._fonts["label"], fill=p.text)
+        wifi_text = self._wifi_usage_text(stats)
+        draw.text((x + w - 14, y + 10), wifi_text, font=self._fonts["label"], fill=p.muted, anchor="ra")
         art_top = y + 38
         art_h = h - 48
         if not stats.bonsai_lines:
@@ -660,13 +790,26 @@ class DashboardRenderer:
 
     @staticmethod
     def _gpu_detail(stats: DashboardStats) -> str:
-        if stats.gpu_vram_used_mb is None or stats.gpu_vram_total_mb is None:
-            return f"{stats.gpu_temp:.0f}°C" if stats.gpu_temp is not None else "No data"
-        return f"{stats.gpu_vram_used_mb / 1024:.1f} / {stats.gpu_vram_total_mb / 1024:.0f} GB VRAM"
+        parts: list[str] = []
+        if stats.gpu_temp is not None:
+            parts.append(f"{stats.gpu_temp:.0f}°C")
+        if stats.gpu_vram_used_mb is not None and stats.gpu_vram_total_mb is not None:
+            parts.append(
+                f"{stats.gpu_vram_used_mb / 1024:.1f} / {stats.gpu_vram_total_mb / 1024:.0f} GB"
+            )
+        return "  ·  ".join(parts) if parts else "No data"
 
     @staticmethod
     def _format_speed(kbps: float) -> str:
         return f"{kbps / 1024:.1f} MB/s" if kbps >= 1024 else f"{kbps:.0f} KB/s"
+
+    @staticmethod
+    def _wifi_usage_text(stats: DashboardStats) -> str:
+        month = format_data_bytes(stats.wifi_month_bytes)
+        if stats.wifi_month_avg_bytes is None:
+            return f"WiFi {month}"
+        avg = format_data_bytes(stats.wifi_month_avg_bytes)
+        return f"WiFi {month} · avg {avg}"
 
     @staticmethod
     def _format_uptime(seconds: float) -> str:

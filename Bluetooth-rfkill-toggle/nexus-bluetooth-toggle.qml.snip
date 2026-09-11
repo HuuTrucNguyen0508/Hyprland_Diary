@@ -1,0 +1,9 @@
+// from modules/nexus/pages/BluetoothPage.qml lines 28-35
+        ToggleRow {
+            first: true
+            text: qsTr("Bluetooth")
+            font: Tokens.font.body.medium
+            horizontalPadding: Tokens.padding.largeIncreased
+            checked: root.btEnabled
+            onToggled: BluetoothControl.setEnabled(checked)
+        }

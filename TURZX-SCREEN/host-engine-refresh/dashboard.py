@@ -23,6 +23,7 @@ from settings import SettingsWatcher  # noqa: E402
 from speedtest_state import SpeedtestWatcher  # noqa: E402
 from stats import StatsCollector  # noqa: E402
 from theme import SchemeWatcher  # noqa: E402
+from usb_guard import refresh_interval, try_lcd_write, wait_until_stable  # noqa: E402
 from turzx_screen import (  # noqa: E402
     CONTENT_ROTATE,
     DEFAULT_CROP_ANCHOR,
@@ -298,25 +299,23 @@ def main() -> int:
                 last_view = view
                 last_dirty = None
 
-            speed_visible = view == VIEW_SPEEDTEST
-            if speed_visible:
-                interval = args.speedtest_interval
-            elif busy.is_busy(False):
-                interval = args.busy_interval
-            else:
-                interval = args.idle_interval
-
-            brightness = args.brightness if args.brightness is not None else settings.brightness
-            if lcd is not None and brightness != applied_brightness:
-                lcd.SetBrightness(brightness)
-                applied_brightness = brightness
-
             stats = collector.poll(settings)
             busy.note_palette(renderer.palette)
+            speed_visible = view == VIEW_SPEEDTEST
+            interval = refresh_interval(
+                speed_visible=speed_visible,
+                busy=busy.is_busy(False),
+                idle_interval=args.idle_interval,
+                busy_interval=args.busy_interval,
+                speedtest_interval=args.speedtest_interval,
+                gpu_percent=stats.gpu_percent,
+            )
+            brightness = args.brightness if args.brightness is not None else settings.brightness
             dirty = logical_dirty_key(renderer.palette, speed_state, stats, view=view)
 
             if (
-                dirty == last_dirty
+                lcd is not None
+                and dirty == last_dirty
                 and not speed_visible
                 and not args.once
                 and not args.preview
@@ -357,6 +356,10 @@ def main() -> int:
                 print(f"Saved {args.output} paste=({paste_x},{paste_y})")
             elif lcd is None:
                 time.sleep(usb_backoff_s)
+                if not wait_until_stable():
+                    print(f"USB reconnect failed: device not stable; retrying in {usb_backoff_s:.0f}s")
+                    usb_backoff_s = min(30.0, usb_backoff_s * 2)
+                    continue
                 try:
                     lcd = open_lcd()
                     usb_backoff_s = 1.0
@@ -367,12 +370,12 @@ def main() -> int:
                     usb_backoff_s = min(30.0, usb_backoff_s * 2)
                 continue
             else:
-                try:
-                    lcd.DisplayPILImage(frame)
-                    usb_backoff_s = 1.0
-                except Exception as exc:
-                    # Stale handle after USB blip — reopen instead of spinning on Errno 19
-                    print(f"USB display failed ({exc}); reconnecting in {usb_backoff_s:.0f}s")
+                ok, applied_brightness = try_lcd_write(
+                    lcd, frame, brightness, applied_brightness
+                )
+                if not ok:
+                    # Stale handle after USB blip — reopen instead of dying on Errno 19
+                    print(f"USB reconnecting in {usb_backoff_s:.0f}s")
                     close_lcd(lcd)
                     lcd = None
                     applied_brightness = -1
@@ -380,6 +383,7 @@ def main() -> int:
                     time.sleep(usb_backoff_s)
                     usb_backoff_s = min(30.0, usb_backoff_s * 2)
                     continue
+                usb_backoff_s = 1.0
 
             last_dirty = dirty
 

@@ -103,6 +103,7 @@ Caelestia picks colours from the wallpaper. These entries hook other apps into `
 | ------------------------------------------------- | ----------------------------------------------------- |
 | [Helium hypr layout](./Helium-hypr-layout/)       | Vertical tabs left on DP-3, right on HDMI-A-1 when Helium moves |
 | [Caelestia launcher (Flow-style)](./Caelestia-launcher-flow/) | Super launcher with files, calc, windows, PATH runner, URLs |
+| [Bluetooth rfkill toggle](./Bluetooth-rfkill-toggle/) | Soft-blocked MediaTek BT and Caelestia switches that cannot power it back on |
 | [Orca theme + Caelestia](./Orca-ide-theme-error/) | Fish shell overriding Orca/Cursor terminal background |
 
 

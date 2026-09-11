@@ -16,8 +16,12 @@ Live code: `~/Documents/dashboard/dashboard.py`
 - Always-on stats at ~1 Hz. Speedtest overlay only (`Super+Shift+F`).
 - Ambient, peek latch, and game-mode view switching are unused. JPEG flood plus view flips was resetting the panel.
 - If USB is missing at start, the service stays up and retries with backoff (does not crash-loop on `USB device not found`).
-- On errno 19 mid-run, drop the handle and reopen the same way.
+- On errno 19 mid-run, drop the handle and reopen the same way. SetBrightness is in that same catch. A write after reconnect used to raise outside the try, systemd restarted the service, and `set_configuration` during the flap produced `can't set config #1, error -71`. The panel then stayed black until the hub settled (~90 s on 26 Aug 2026 with Arknights Endfield via Lutris).
+- Wait until `1cbe:0080` has been present for 1.5 s before reopening. Do not JPEG into a device that just re-enumerated.
+- GPU load ≥ 40% slows USB to 5 s so nvidia-smi changes do not keep a 1 Hz JPEG stream on the hub while the GPU is busy. Speedtest stays ASAP.
 - 0.35 s settle when switching stats ↔ speedtest.
+
+Helpers: `~/Documents/dashboard/usb_guard.py`. Tests (no hardware): `python test_usb_guard.py`.
 
 Restart:
 
@@ -25,7 +29,15 @@ Restart:
 systemctl --user restart turzx-dashboard.service
 ```
 
-Journal should show `views=stats,speedtest (ambient off)` then `view - -> stats`.
+Journal should show `views=stats,speedtest (ambient off)` then `view - -> stats`. No python traceback after `USB reconnected`.
+
+## Copies in this folder
+
+| File | Role |
+|------|------|
+| `99-turzx-usb-power.rules` | Keep hub + panel awake |
+| `usb_guard.py` | Settle wait, GPU-throttled interval, caught writes |
+| `test_usb_guard.py` | No-hardware checks for the catch + settle |
 
 ## Hub autosuspend (one-time, needs sudo)
 

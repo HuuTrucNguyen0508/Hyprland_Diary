@@ -38,6 +38,7 @@ journalctl --user -u turzx-dashboard.service -n 5 --no-pager | rg 'SEND|palette'
 |------|-------|------------|
 | Idle | 1.0 s (`--idle-interval`) | Yes |
 | Scheme burst (8 s after palette change) | 0.25 s (`--busy-interval`) | Yes |
+| GPU load ≥ 40% | 5.0 s (floor; still dirty-skip) | Yes |
 | Speedtest gauges | 0 (`--speedtest-interval`) | No |
 
 Busy burst fires when Caelestia scheme name/hash changes. Speedtest runs flat out (~4.7–5 fps measured). Idle stays cheap on CPU.
@@ -92,6 +93,7 @@ Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 | Piece | Path |
 |-------|------|
 | Loop | `~/Documents/dashboard/dashboard.py` |
+| USB reconnect / GPU throttle | `~/Documents/dashboard/usb_guard.py` |
 | Dirty / busy | `~/Documents/dashboard/frame_dirty.py` |
 | Layout | `~/Documents/dashboard/renderer.py` |
 | Orientation | `~/Documents/dashboard/turzx_screen.py` |
@@ -107,6 +109,7 @@ Spike notes and probes: [refresh-upgrade-spike](../refresh-upgrade-spike/).
 | File | Role |
 |------|------|
 | `dashboard.py` | Loop (stats + speedtest) |
+| `usb_guard.py` | USB settle + GPU-load interval |
 | `frame_dirty.py` | Fingerprint + scheme burst |
 | `renderer.py` | Stats layout (`render_terminal` unused) |
 | `ambient_cycle.py` | Old ambient rotation (unused) |
