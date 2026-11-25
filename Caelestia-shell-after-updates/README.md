@@ -108,7 +108,14 @@ pacman -Qqm | xargs pacman -Qql 2>/dev/null \
   | while read -r f; do [ -f "$f" ] && ldd "$f" 2>/dev/null | grep -q 'not found' && echo "$f"; done
 ```
 
-Any file it prints belongs to an AUR package that needs a rebuild, or that is dead and can go. `pacman -Qo <file>` tells you which package.
+Any file it prints belongs to an AUR package that needs a rebuild, or that is dead and can go. `pacman -Qo <file>` tells you which package. The same sweep found `ffmpeg3.4` still linked to `libbluray.so.3` after libbluray moved to `.so.4`; a plain `makepkg -f` of the unchanged AUR recipe fixed it.
+
+Expect some false positives from Java. The `jre8` package (`/usr/lib/jvm/java-8-jre/`) shows up with dozens of files, and none of them are broken:
+
+- Most only miss `libjvm.so`, `libgstreamer-lite.so` or `libglib-lite.so`. Those live inside the JRE, and Java loads them itself at startup, which `ldd` can't see. `java -version` running is the real test.
+- The `libavplugin-*.so` files are JavaFX media plugins, one per ffmpeg version. Java loads the one that matches the installed ffmpeg and ignores the rest, so the others are meant to have missing `libavcodec.so.NN` links.
+
+To hide them, add `| grep -v '^/usr/lib/jvm/'` to the end of the sweep.
 
 ## Live paths
 
